@@ -1,0 +1,53 @@
+<h1>Book {{ vehicle.name }}</h1>
+
+<p><strong>Model:</strong> {{ vehicle.model }}</p>
+<p><strong>Plate:</strong> {{ vehicle.plate_number }}</p>
+<p><strong>Price per day:</strong> KES {{ vehicle.price_per_day }}</p>
+<p><strong>Status:</strong> {{ vehicle.status }}</p>
+
+{% if vehicle.image %}
+    <img src="{{ vehicle.image.url }}" width="300">
+{% endif %}
+
+{% if vehicle.next_available_date %}
+    <p><strong>Next available date:</strong> {{ vehicle.next_available_date }}</p>
+{% endif %}
+
+<br>
+
+{% if error %}
+    <p style="color:red;"><strong>{{ error }}</strong></p>
+{% endif %}
+
+{% if success %}
+    <div style="border:1px solid green; padding:10px; margin:10px 0;">
+        <p style="color:green;"><strong>{{ success }}</strong></p>
+        <p>Booking ID: {{ booking.id }}</p>
+        <p>Total amount: KES {{ booking.total_amount }}</p>
+        <p>Status: {{ booking.status }}</p>
+    </div>
+{% endif %}
+
+<form method="POST">
+    {% csrf_token %}
+
+    <label>Customer ID:</label><br>
+    <input type="number" name="customer_id" required><br><br>
+
+    <label>Start Date:</label><br>
+    <input type="date" name="start_date" required><br><br>
+
+    <label>End Date:</label><br>
+    <input type="date" name="end_date" required><br><br>
+
+    <label>Delivery Location (optional):</label><br>
+    <input type="text" name="delivery_location"><br><br>
+
+    <button type="submit">Confirm Booking</button>
+</form>
+
+<br>
+
+<a href="/">
+    <button>Back to Home</button>
+</a>

@@ -1,0 +1,27 @@
+<h1>RIRI Car Rentals</h1>
+
+{% for vehicle in vehicles %}
+    <div style="border:1px solid black; margin:10px; padding:10px;">
+        <h3>{{ vehicle.name }}</h3>
+        <p>Model: {{ vehicle.model }}</p>
+        <p>Plate: {{ vehicle.plate_number }}</p>
+        <p>Price per day: KES {{ vehicle.price_per_day }}</p>
+        <p>Status: {{ vehicle.status }}</p>
+
+        {% if vehicle.next_available_date %}
+            <p>Next available date: {{ vehicle.next_available_date }}</p>
+        {% endif %}
+
+        {% if vehicle.image %}
+            <img src="{{ vehicle.image.url }}" width="200">
+        {% endif %}
+
+        <br><br>
+
+        <a href="{% url 'book_vehicle' vehicle.id %}">
+            <button>Book Now</button>
+        </a>
+    </div>
+{% empty %}
+    <p>No vehicles added yet.</p>
+{% endfor %}

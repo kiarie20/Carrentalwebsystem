@@ -1,0 +1,40 @@
+from django.contrib import admin
+from .models import Customer, Vehicle, Document, Booking, Payment, DeliveryAgreement
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ('user', 'phone', 'national_id_number', 'address')
+    search_fields = ('user__username', 'phone', 'national_id_number')
+
+
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'model', 'plate_number', 'price_per_day', 'status', 'next_available_date')
+    list_filter = ('status',)
+    search_fields = ('name', 'model', 'plate_number')
+
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'verification_status', 'uploaded_at')
+    list_filter = ('verification_status',)
+
+
+@admin.register(Booking)
+class BookingAdmin(admin.ModelAdmin):
+    list_display = ('customer', 'vehicle', 'start_date', 'end_date', 'total_amount', 'status', 'created_at')
+    list_filter = ('status', 'start_date')
+    search_fields = ('customer__user__username', 'vehicle__name')
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('booking', 'amount', 'payment_method', 'transaction_code', 'status', 'paid_at')
+    list_filter = ('status', 'payment_method')
+
+
+@admin.register(DeliveryAgreement)
+class DeliveryAgreementAdmin(admin.ModelAdmin):
+    list_display = ('booking', 'delivery_location', 'agreement_signed', 'delivery_date')
+    list_filter = ('agreement_signed',)
