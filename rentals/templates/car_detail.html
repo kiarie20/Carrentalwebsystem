@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}RIRI Car Rentals | {{ vehicle.name }}{% endblock %}
+
+{% block content %}
+<section class="page-section shell detail-layout">
+    <div class="detail-main">
+        <nav class="breadcrumbs">
+            <a href="{% url 'home' %}">Home</a>
+            <span>/</span>
+            <a href="{% url 'car_list' %}">Cars</a>
+            <span>/</span>
+            <strong>{{ vehicle.name }}</strong>
+        </nav>
+
+        <div class="detail-hero-card">
+            {% if vehicle.image %}
+                <img class="detail-hero-image" src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+            {% endif %}
+        </div>
+
+        <div class="thumbnail-row">
+            {% for item in gallery_items %}
+                <div class="thumbnail-card">
+                    {% if vehicle.image %}
+                        <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <section class="content-panel">
+            <div class="tab-row">
+                <a class="is-active" href="#overview">Overview</a>
+                <a href="#features">Features</a>
+                <a href="#specs">Specifications</a>
+            </div>
+
+            <div id="overview">
+                <p class="lead-copy">{{ vehicle.description }}</p>
+            </div>
+
+            <div id="features" class="icon-grid">
+                {% for feature in features %}
+                    <article class="icon-spec">
+                        <strong>{{ feature }}</strong>
+                    </article>
+                {% endfor %}
+            </div>
+
+            <div id="specs" class="spec-grid">
+                {% for label, value in specs %}
+                    <div class="spec-item">
+                        <span>{{ label }}</span>
+                        <strong>{{ value }}</strong>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if related_vehicles %}
+            <section class="related-section">
+                <div class="section-heading">
+                    <h2>Similar Cars</h2>
+                    <p>More vehicles in the same class.</p>
+                </div>
+                <div class="vehicle-grid compact-grid">
+                    {% for item in related_vehicles %}
+                        <article class="vehicle-card">
+                            <a href="{% url 'car_detail' item.id %}" class="vehicle-image-wrap">
+                                {% if item.image %}
+                                    <img src="{{ item.image.url }}" alt="{{ item.name }}">
+                                {% endif %}
+                            </a>
+                            <div class="vehicle-card-body">
+                                <h3>{{ item.name }}</h3>
+                                <p class="vehicle-meta">{{ item.vehicle_type }} . {{ item.transmission }} . {{ item.fuel_type }}</p>
+                                <div class="vehicle-actions-row">
+                                    <a class="secondary-button" href="{% url 'car_detail' item.id %}">View Details</a>
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
+    </div>
+
+    <aside class="detail-sidebar">
+        <div class="booking-summary sticky-card">
+            <h1>{{ vehicle.name }}</h1>
+            <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
+            <div class="rating-row">{{ vehicle.rating }}/5 ({{ vehicle.review_count }} reviews)</div>
+            <div class="detail-price">KES {{ vehicle.price_per_day }} <span>/ day</span></div>
+            <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
+                {{ vehicle.status }}
+            </span>
+            <div class="summary-grid">
+                <div>
+                    <span>Pick-up Location</span>
+                    <strong>{{ vehicle.pickup_location }}</strong>
+                </div>
+                <div>
+                    <span>Drop-off Location</span>
+                    <strong>{{ vehicle.dropoff_location }}</strong>
+                </div>
+                <div>
+                    <span>Sample Duration</span>
+                    <strong>{{ pricing.total_days }} Days</strong>
+                </div>
+                <div>
+                    <span>Estimated Total</span>
+                    <strong>KES {{ pricing.total }}</strong>
+                </div>
+            </div>
+            <a class="primary-button full-width" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+        </div>
+    </aside>
+</section>
+{% endblock %}

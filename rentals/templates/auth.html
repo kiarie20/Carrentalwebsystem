@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}RIRI Car Rentals | Login or Register{% endblock %}
+
+{% block content %}
+<section class="auth-section shell">
+    <div class="auth-layout">
+        <div class="auth-visual">
+            {% if hero_vehicle and hero_vehicle.image %}
+                <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+            {% endif %}
+            <div class="auth-overlay">
+                <span class="eyebrow">RIRI Car Rentals</span>
+                <h1>Premium Car Rentals For Every <span>Journey</span></h1>
+                <p>Reliable, affordable and hassle-free rentals backed by responsive support and transparent pricing.</p>
+                <div class="benefit-stack light">
+                    {% for benefit in benefits %}
+                        <div class="benefit-stack-item">
+                            <strong>{{ benefit.title }}</strong>
+                            <p>{{ benefit.copy }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-panels">
+            <a class="back-link" href="{% url 'home' %}">Back to Home</a>
+            <div class="auth-card-grid">
+                <section class="content-panel">
+                    <h2>Login</h2>
+                    <p>Welcome back. Sign in to continue booking and managing your trips.</p>
+                    <form method="post" class="stack-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="login">
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        <div class="field-group">
+                            <label for="{{ login_form.email.id_for_label }}">Email Address</label>
+                            {{ login_form.email }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ login_form.password.id_for_label }}">Password</label>
+                            {{ login_form.password }}
+                        </div>
+                        {% if login_form.non_field_errors %}
+                            <div class="form-errors">{{ login_form.non_field_errors }}</div>
+                        {% endif %}
+                        <button class="primary-button full-width" type="submit">Login</button>
+                    </form>
+                </section>
+
+                <section class="content-panel">
+                    <h2>Create Account</h2>
+                    <p>Fill in your details to start browsing, booking, and managing your rentals.</p>
+                    <form method="post" class="stack-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="register">
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        <div class="field-group">
+                            <label for="{{ register_form.full_name.id_for_label }}">Full Name</label>
+                            {{ register_form.full_name }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ register_form.email.id_for_label }}">Email Address</label>
+                            {{ register_form.email }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ register_form.phone.id_for_label }}">Phone Number</label>
+                            {{ register_form.phone }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ register_form.password1.id_for_label }}">Password</label>
+                            {{ register_form.password1 }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ register_form.password2.id_for_label }}">Confirm Password</label>
+                            {{ register_form.password2 }}
+                        </div>
+                        {% if register_form.errors %}
+                            <div class="form-errors">
+                                {% for field in register_form %}
+                                    {% for error in field.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in register_form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <button class="primary-button full-width" type="submit">Register</button>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

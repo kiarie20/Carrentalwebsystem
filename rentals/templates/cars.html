@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}RIRI Car Rentals | Cars{% endblock %}
+
+{% block content %}
+<section class="page-section shell listing-layout">
+    <aside class="filter-panel">
+        <h2>Filter Cars</h2>
+        <form method="get" class="filter-form">
+            <div class="field-group">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="q" value="{{ search_query }}" placeholder="Search by name or model">
+            </div>
+            <div class="field-group">
+                <label for="type">Car Type</label>
+                <select id="type" name="type">
+                    <option value="">All Types</option>
+                    {% for item in vehicle_types %}
+                        <option value="{{ item }}" {% if selected_type == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label for="transmission">Transmission</label>
+                <select id="transmission" name="transmission">
+                    <option value="">All</option>
+                    {% for item in transmission_types %}
+                        <option value="{{ item }}" {% if selected_transmission == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label for="fuel">Fuel Type</label>
+                <select id="fuel" name="fuel">
+                    <option value="">All</option>
+                    {% for item in fuel_types %}
+                        <option value="{{ item }}" {% if selected_fuel == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label for="sort">Sort By</label>
+                <select id="sort" name="sort">
+                    <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>Price: Low to High</option>
+                    <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Price: High to Low</option>
+                    <option value="rating_desc" {% if selected_sort == 'rating_desc' %}selected{% endif %}>Top Rated</option>
+                    <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name</option>
+                </select>
+            </div>
+            <button class="primary-button full-width" type="submit">Apply Filters</button>
+        </form>
+    </aside>
+
+    <div class="listing-main">
+        <div class="section-heading">
+            <h1>Available Cars</h1>
+            <p>Showing {{ result_count }} vehicle{{ result_count|pluralize }} tailored to your current filters.</p>
+        </div>
+
+        <div class="vehicle-grid compact-grid">
+            {% for vehicle in page_obj.object_list %}
+                <article class="vehicle-card">
+                    <a href="{% url 'car_detail' vehicle.id %}" class="vehicle-image-wrap">
+                        {% if vehicle.image %}
+                            <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                        {% endif %}
+                    </a>
+                    <div class="vehicle-card-body">
+                        <div class="vehicle-topline">
+                            <h3>{{ vehicle.name }}</h3>
+                            <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
+                                {{ vehicle.status }}
+                            </span>
+                        </div>
+                        <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
+                        <div class="vehicle-price-row">
+                            <strong>KES {{ vehicle.price_per_day }}</strong>
+                            <span>{{ vehicle.rating }}/5 ({{ vehicle.review_count }})</span>
+                        </div>
+                        <div class="vehicle-actions-row">
+                            <a class="secondary-button" href="{% url 'car_detail' vehicle.id %}">View Details</a>
+                            <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+                        </div>
+                    </div>
+                </article>
+            {% empty %}
+                <article class="empty-card">
+                    <h3>No cars match your filters</h3>
+                    <p>Try clearing one or two filters and search again.</p>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="pagination">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Previous</a>
+                {% endif %}
+                {% for number in page_obj.paginator.page_range %}
+                    <a href="?page={{ number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}" class="{% if page_obj.number == number %}is-current{% endif %}">{{ number }}</a>
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Next</a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

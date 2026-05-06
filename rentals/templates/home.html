@@ -1,27 +1,107 @@
-<h1>RIRI Car Rentals</h1>
+{% extends 'base.html' %}
 
-{% for vehicle in vehicles %}
-    <div style="border:1px solid black; margin:10px; padding:10px;">
-        <h3>{{ vehicle.name }}</h3>
-        <p>Model: {{ vehicle.model }}</p>
-        <p>Plate: {{ vehicle.plate_number }}</p>
-        <p>Price per day: KES {{ vehicle.price_per_day }}</p>
-        <p>Status: {{ vehicle.status }}</p>
+{% block title %}RIRI Car Rentals | Home{% endblock %}
 
-        {% if vehicle.next_available_date %}
-            <p>Next available date: {{ vehicle.next_available_date }}</p>
-        {% endif %}
-
-        {% if vehicle.image %}
-            <img src="{{ vehicle.image.url }}" width="200">
-        {% endif %}
-
-        <br><br>
-
-        <a href="{% url 'book_vehicle' vehicle.id %}">
-            <button>Book Now</button>
-        </a>
+{% block content %}
+<section class="hero-section">
+    <div class="shell hero-grid">
+        <div class="hero-copy">
+            <span class="eyebrow">Premium Car Rentals</span>
+            <h1>Find The Perfect Car For Your <span>Journey</span></h1>
+            <p>Reliable, affordable and hassle-free car rentals for every trip, occasion, and schedule.</p>
+            <div class="hero-actions">
+                <a class="primary-button" href="{% url 'car_list' %}">Book Now</a>
+                <a class="ghost-button light" href="{% url 'auth_page' %}">Login or Register</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            {% if hero_vehicle and hero_vehicle.image %}
+                <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+            {% endif %}
+        </div>
     </div>
-{% empty %}
-    <p>No vehicles added yet.</p>
-{% endfor %}
+</section>
+
+<section class="search-band shell">
+    <form class="search-card" method="get" action="{% url 'car_list' %}">
+        <div class="field-group">
+            <label for="pickup_location">Pick-up Location</label>
+            <input id="pickup_location" name="q" type="text" placeholder="Select location">
+        </div>
+        <div class="field-group">
+            <label for="start_date">Pick-up Date</label>
+            <input id="start_date" name="start_date" type="date">
+        </div>
+        <div class="field-group">
+            <label for="end_date">Drop-off Date</label>
+            <input id="end_date" name="end_date" type="date">
+        </div>
+        <div class="field-group">
+            <label for="vehicle_type">Vehicle Type</label>
+            <select id="vehicle_type" name="type">
+                <option value="">All Types</option>
+                {% for item in vehicle_types %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="primary-button search-submit" type="submit">Search Cars</button>
+    </form>
+</section>
+
+<section class="benefits-section shell" id="services">
+    <div class="section-heading centered">
+        <h2>Why Choose RIRI Car Rentals?</h2>
+        <p>Built for smooth booking, flexible travel, and dependable support from start to finish.</p>
+    </div>
+    <div class="benefit-grid">
+        {% for benefit in benefits %}
+            <article class="benefit-card">
+                <span class="benefit-icon">{{ forloop.counter }}</span>
+                <div>
+                    <h3>{{ benefit.title }}</h3>
+                    <p>{{ benefit.copy }}</p>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="cars-preview shell">
+    <div class="section-heading with-action">
+        <div>
+            <h2>Popular Vehicles</h2>
+            <p>Browse our most booked and most loved vehicles.</p>
+        </div>
+        <a href="{% url 'car_list' %}" class="text-link">View All Cars</a>
+    </div>
+    <div class="vehicle-grid">
+        {% for vehicle in featured_vehicles %}
+            <article class="vehicle-card">
+                <a href="{% url 'car_detail' vehicle.id %}" class="vehicle-image-wrap">
+                    {% if vehicle.image %}
+                        <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                    {% endif %}
+                </a>
+                <div class="vehicle-card-body">
+                    <div class="vehicle-topline">
+                        <h3>{{ vehicle.name }}</h3>
+                        <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
+                            {{ vehicle.status }}
+                        </span>
+                    </div>
+                    <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
+                    <div class="vehicle-price-row">
+                        <strong>KES {{ vehicle.price_per_day }}</strong>
+                        <span>{{ vehicle.rating }}/5 ({{ vehicle.review_count }})</span>
+                    </div>
+                    <div class="vehicle-actions-row">
+                        <a class="secondary-button" href="{% url 'car_detail' vehicle.id %}">View Details</a>
+                        <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

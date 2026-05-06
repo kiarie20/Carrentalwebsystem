@@ -1,53 +1,135 @@
-<h1>Book {{ vehicle.name }}</h1>
+{% extends 'base.html' %}
 
-<p><strong>Model:</strong> {{ vehicle.model }}</p>
-<p><strong>Plate:</strong> {{ vehicle.plate_number }}</p>
-<p><strong>Price per day:</strong> KES {{ vehicle.price_per_day }}</p>
-<p><strong>Status:</strong> {{ vehicle.status }}</p>
+{% block title %}RIRI Car Rentals | Booking{% endblock %}
 
-{% if vehicle.image %}
-    <img src="{{ vehicle.image.url }}" width="300">
-{% endif %}
+{% block content %}
+<section class="page-section shell booking-layout">
+    <div class="booking-main">
+        <nav class="breadcrumbs">
+            <a href="{% url 'home' %}">Home</a>
+            <span>/</span>
+            <a href="{% url 'car_list' %}">Cars</a>
+            <span>/</span>
+            <strong>Booking</strong>
+        </nav>
 
-{% if vehicle.next_available_date %}
-    <p><strong>Next available date:</strong> {{ vehicle.next_available_date }}</p>
-{% endif %}
+        <div class="section-heading">
+            <h1>Booking Details</h1>
+            <p>Fill in your trip details and confirm your booking for {{ vehicle.name }}.</p>
+        </div>
 
-<br>
+        <div class="content-panel">
+            <div class="booking-vehicle">
+                {% if vehicle.image %}
+                    <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                {% endif %}
+                <div>
+                    <h2>{{ vehicle.name }}</h2>
+                    <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
+                    <strong class="detail-price">KES {{ vehicle.price_per_day }} <span>/ day</span></strong>
+                </div>
+            </div>
 
-{% if error %}
-    <p style="color:red;"><strong>{{ error }}</strong></p>
-{% endif %}
+            {% if error %}
+                <div class="alert-card alert-error">{{ error }}</div>
+            {% endif %}
 
-{% if success %}
-    <div style="border:1px solid green; padding:10px; margin:10px 0;">
-        <p style="color:green;"><strong>{{ success }}</strong></p>
-        <p>Booking ID: {{ booking.id }}</p>
-        <p>Total amount: KES {{ booking.total_amount }}</p>
-        <p>Status: {{ booking.status }}</p>
+            {% if success %}
+                <div class="alert-card alert-success">
+                    <strong>{{ success }}</strong>
+                    <p>Booking ID: {{ booking.id }} | Status: {{ booking.status }} | Total: KES {{ booking.total_amount }}</p>
+                </div>
+            {% endif %}
+
+            {% if not request.user.is_authenticated %}
+                <div class="alert-card">
+                    <strong>Login required.</strong>
+                    <p>Sign in or create an account before confirming your booking.</p>
+                    <a class="primary-button" href="{% url 'auth_page' %}?next={% url 'book_vehicle' vehicle.id %}">Continue to Login</a>
+                </div>
+            {% endif %}
+
+            {% if request.user.is_authenticated and document_status %}
+                <div class="alert-card">
+                    <strong>Document status:</strong>
+                    <p>{{ document_status }}</p>
+                </div>
+            {% endif %}
+
+            <form method="post" class="booking-form-grid">
+                {% csrf_token %}
+                <div class="field-group">
+                    <label for="{{ form.pickup_location.id_for_label }}">Pick-up Location</label>
+                    {{ form.pickup_location }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ form.dropoff_location.id_for_label }}">Drop-off Location</label>
+                    {{ form.dropoff_location }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ form.start_date.id_for_label }}">Pick-up Date</label>
+                    {{ form.start_date }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ form.end_date.id_for_label }}">Drop-off Date</label>
+                    {{ form.end_date }}
+                </div>
+                <div class="field-group field-span-2">
+                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (optional)</label>
+                    {{ form.delivery_location }}
+                </div>
+                {% if form.non_field_errors %}
+                    <div class="field-span-2 form-errors">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <button class="primary-button full-width field-span-2" type="submit">Proceed to Payment</button>
+            </form>
+        </div>
+
+        <div class="pricing-panel">
+            <div class="pricing-row">
+                <span>Daily Rate</span>
+                <strong>KES {{ vehicle.price_per_day }}</strong>
+            </div>
+            <div class="pricing-row">
+                <span>Total Days</span>
+                <strong>{{ pricing.total_days }}</strong>
+            </div>
+            <div class="pricing-row">
+                <span>Taxes & Fees</span>
+                <strong>KES {{ pricing.taxes }}</strong>
+            </div>
+            <div class="pricing-row total-row">
+                <span>Total Amount</span>
+                <strong>KES {{ pricing.total }}</strong>
+            </div>
+        </div>
     </div>
-{% endif %}
 
-<form method="POST">
-    {% csrf_token %}
+    <aside class="booking-side">
+        <div class="content-panel sticky-card">
+            <h2>Extras</h2>
+            <div class="extras-list">
+                {% for extra in extras %}
+                    <article class="extra-card">
+                        <div>
+                            <strong>{{ extra.name }}</strong>
+                            <p>{{ extra.description }}</p>
+                        </div>
+                        <span>KES {{ extra.price }} / day</span>
+                    </article>
+                {% endfor %}
+            </div>
 
-    <label>Customer ID:</label><br>
-    <input type="number" name="customer_id" required><br><br>
-
-    <label>Start Date:</label><br>
-    <input type="date" name="start_date" required><br><br>
-
-    <label>End Date:</label><br>
-    <input type="date" name="end_date" required><br><br>
-
-    <label>Delivery Location (optional):</label><br>
-    <input type="text" name="delivery_location"><br><br>
-
-    <button type="submit">Confirm Booking</button>
-</form>
-
-<br>
-
-<a href="/">
-    <button>Back to Home</button>
-</a>
+            <h2>Your Benefits</h2>
+            <div class="benefit-stack">
+                {% for benefit in benefits %}
+                    <div class="benefit-stack-item">
+                        <strong>{{ benefit.title }}</strong>
+                        <p>{{ benefit.copy }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}

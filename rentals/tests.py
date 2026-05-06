@@ -9,9 +9,18 @@ from django.urls import reverse
 from .models import Booking, Customer, Document, Payment, Vehicle
 
 
+class PublicPageTests(TestCase):
+    def test_home_page_seeds_demo_vehicles(self):
+        response = self.client.get(reverse('home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(Vehicle.objects.count(), 0)
+        self.assertContains(response, 'Popular Vehicles')
+
+
 class BookingWorkflowTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='customer1', password='pass12345')
+        self.user = User.objects.create_user(username='customer1@example.com', password='pass12345')
         self.customer = Customer.objects.create(
             user=self.user,
             phone='0712345678',
@@ -28,14 +37,29 @@ class BookingWorkflowTests(TestCase):
             name='Toyota Corolla',
             model='Axio',
             plate_number='KDA 123A',
+            vehicle_type='Sedan',
+            transmission='Automatic',
+            fuel_type='Petrol',
+            seat_count=5,
+            door_count=4,
+            year=2024,
+            mileage=12000,
+            engine_size='2.0L',
+            drive_type='FWD',
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            rating=Decimal('4.6'),
+            review_count=120,
             price_per_day=Decimal('2500.00'),
         )
 
     def test_booking_creates_payment_and_updates_vehicle(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
-                'customer_id': self.customer.id,
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
                 'start_date': '2026-05-10',
                 'end_date': '2026-05-12',
                 'delivery_location': 'Westlands',
@@ -49,6 +73,7 @@ class BookingWorkflowTests(TestCase):
 
         self.assertEqual(booking.total_amount, Decimal('7500.00'))
         self.assertEqual(booking.status, 'Pending')
+        self.assertEqual(booking.pickup_location, 'Nairobi, Kenya')
         self.assertEqual(payment.amount, Decimal('7500.00'))
         self.assertEqual(payment.status, 'Pending')
         self.assertEqual(self.vehicle.status, 'Booked')
@@ -56,9 +81,12 @@ class BookingWorkflowTests(TestCase):
         self.assertTrue(hasattr(booking, 'deliveryagreement'))
 
     def test_booking_rejects_overlapping_dates(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
         Booking.objects.create(
             customer=self.customer,
             vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
             start_date=date(2026, 5, 10),
             end_date=date(2026, 5, 12),
             total_amount=Decimal('7500.00'),
@@ -68,7 +96,8 @@ class BookingWorkflowTests(TestCase):
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
-                'customer_id': self.customer.id,
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
                 'start_date': '2026-05-11',
                 'end_date': '2026-05-13',
             },
@@ -79,12 +108,14 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(Payment.objects.count(), 0)
 
     def test_booking_requires_approved_documents(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
         Document.objects.filter(customer=self.customer).update(verification_status='Pending')
 
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
-                'customer_id': self.customer.id,
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
                 'start_date': '2026-05-10',
                 'end_date': '2026-05-12',
             },
@@ -92,3 +123,17 @@ class BookingWorkflowTests(TestCase):
 
         self.assertContains(response, 'documents must be approved')
         self.assertEqual(Booking.objects.count(), 0)
+
+    def test_booking_redirects_anonymous_users_to_auth(self):
+        response = self.client.post(
+            reverse('book_vehicle', args=[self.vehicle.id]),
+            {
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
+                'start_date': '2026-05-10',
+                'end_date': '2026-05-12',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('auth_page'), response.url)

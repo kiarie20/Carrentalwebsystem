@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}RIRI Car Rentals{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="shell nav-shell">
+            <a class="brand" href="{% url 'home' %}">
+                <span class="brand-mark">R</span>
+                <span>
+                    <strong>RIRI</strong>
+                    <small>Car Rentals</small>
+                </span>
+            </a>
+            <nav class="main-nav">
+                <a href="{% url 'home' %}" class="{% if active_page == 'home' %}is-active{% endif %}">Home</a>
+                <a href="{% url 'car_list' %}" class="{% if active_page == 'cars' %}is-active{% endif %}">Cars</a>
+                <a href="{% url 'home' %}#services">Services</a>
+                <a href="{% url 'home' %}#about">About Us</a>
+                <a href="{% url 'home' %}#contact">Contact</a>
+            </nav>
+            <div class="nav-actions">
+                <span class="nav-phone">+254 700 123 456</span>
+                {% if request.user.is_authenticated %}
+                    <a class="ghost-button" href="{% url 'logout_user' %}">Logout</a>
+                {% else %}
+                    <a class="ghost-button" href="{% url 'auth_page' %}">Login</a>
+                    <a class="primary-button" href="{% url 'auth_page' %}">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer" id="contact">
+        <div class="shell footer-grid">
+            <div>
+                <h3>RIRI Car Rentals</h3>
+                <p>Premium, practical car hire for city rides, business travel, and long-distance journeys across Kenya.</p>
+            </div>
+            <div>
+                <h4>Contact</h4>
+                <p>Nairobi, Kenya</p>
+                <p>+254 700 123 456</p>
+                <p>hello@riricarrentals.com</p>
+            </div>
+            <div id="about">
+                <h4>Why Us</h4>
+                <p>Transparent pricing, responsive support, flexible bookings, and reliable vehicles.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

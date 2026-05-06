@@ -1,0 +1,156 @@
+from datetime import timedelta
+from decimal import Decimal
+
+from django.utils import timezone
+
+from .models import Vehicle
+
+
+SAMPLE_VEHICLES = [
+    {
+        'name': 'BMW X5',
+        'model': 'xDrive40i',
+        'plate_number': 'KDR 210A',
+        'vehicle_type': 'SUV',
+        'transmission': 'Automatic',
+        'fuel_type': 'Diesel',
+        'seat_count': 5,
+        'door_count': 4,
+        'year': 2022,
+        'mileage': 25000,
+        'engine_size': '3.0L',
+        'drive_type': 'AWD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.7'),
+        'review_count': 241,
+        'price_per_day': Decimal('80.00'),
+        'status': 'Available',
+        'is_featured': True,
+        'description': 'The BMW X5 blends luxury, comfort, and confident road presence for premium city and highway travel.',
+    },
+    {
+        'name': 'Toyota Camry',
+        'model': '2.5 Hybrid',
+        'plate_number': 'KDR 211B',
+        'vehicle_type': 'Sedan',
+        'transmission': 'Automatic',
+        'fuel_type': 'Petrol',
+        'seat_count': 5,
+        'door_count': 4,
+        'year': 2023,
+        'mileage': 18000,
+        'engine_size': '2.5L',
+        'drive_type': 'FWD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.5'),
+        'review_count': 132,
+        'price_per_day': Decimal('50.00'),
+        'status': 'Available',
+        'is_featured': True,
+        'description': 'A dependable sedan with efficient fuel use, smooth automatic transmission, and comfortable seating.',
+    },
+    {
+        'name': 'Mercedes C-Class',
+        'model': 'C200',
+        'plate_number': 'KDR 212C',
+        'vehicle_type': 'Sedan',
+        'transmission': 'Automatic',
+        'fuel_type': 'Petrol',
+        'seat_count': 5,
+        'door_count': 4,
+        'year': 2021,
+        'mileage': 22000,
+        'engine_size': '2.0L',
+        'drive_type': 'RWD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.6'),
+        'review_count': 200,
+        'price_per_day': Decimal('70.00'),
+        'status': 'Available',
+        'is_featured': True,
+        'description': 'A refined executive sedan ideal for business travel, airport pickups, and stylish weekend drives.',
+    },
+    {
+        'name': 'Toyota Land Cruiser',
+        'model': 'VX',
+        'plate_number': 'KDR 213D',
+        'vehicle_type': 'SUV',
+        'transmission': 'Automatic',
+        'fuel_type': 'Diesel',
+        'seat_count': 7,
+        'door_count': 4,
+        'year': 2020,
+        'mileage': 41000,
+        'engine_size': '4.5L',
+        'drive_type': '4WD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.8'),
+        'review_count': 151,
+        'price_per_day': Decimal('120.00'),
+        'status': 'Booked',
+        'is_featured': False,
+        'description': 'Built for demanding trips and safari routes, with generous seating and strong off-road capability.',
+    },
+    {
+        'name': 'Audi A6',
+        'model': '40 TFSI',
+        'plate_number': 'KDR 214E',
+        'vehicle_type': 'Sedan',
+        'transmission': 'Automatic',
+        'fuel_type': 'Diesel',
+        'seat_count': 5,
+        'door_count': 4,
+        'year': 2022,
+        'mileage': 26000,
+        'engine_size': '2.0L',
+        'drive_type': 'AWD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.4'),
+        'review_count': 98,
+        'price_per_day': Decimal('65.00'),
+        'status': 'Available',
+        'is_featured': False,
+        'description': 'A polished premium sedan offering a quiet cabin, elegant styling, and confident long-distance comfort.',
+    },
+    {
+        'name': 'Nissan X-Trail',
+        'model': '2.5 4WD',
+        'plate_number': 'KDR 215F',
+        'vehicle_type': 'SUV',
+        'transmission': 'Automatic',
+        'fuel_type': 'Petrol',
+        'seat_count': 5,
+        'door_count': 4,
+        'year': 2021,
+        'mileage': 30000,
+        'engine_size': '2.5L',
+        'drive_type': '4WD',
+        'pickup_location': 'Nairobi, Kenya',
+        'dropoff_location': 'Nairobi, Kenya',
+        'rating': Decimal('4.3'),
+        'review_count': 112,
+        'price_per_day': Decimal('60.00'),
+        'status': 'Available',
+        'is_featured': False,
+        'description': 'A practical SUV with balanced comfort, road clearance, and luggage room for family and group trips.',
+    },
+]
+
+
+def ensure_demo_vehicles():
+    if Vehicle.objects.exists():
+        return
+
+    today = timezone.localdate()
+
+    for index, vehicle_data in enumerate(SAMPLE_VEHICLES):
+        payload = vehicle_data.copy()
+        if payload['status'] != 'Available':
+            payload['next_available_date'] = today + timedelta(days=5 + index)
+        payload['image'] = 'vehicles/download_3.jpg'
+        Vehicle.objects.create(**payload)

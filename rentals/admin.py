@@ -10,9 +10,18 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'model', 'plate_number', 'price_per_day', 'status', 'next_available_date')
-    list_filter = ('status',)
-    search_fields = ('name', 'model', 'plate_number')
+    list_display = (
+        'name',
+        'vehicle_type',
+        'model',
+        'plate_number',
+        'price_per_day',
+        'status',
+        'is_featured',
+        'next_available_date',
+    )
+    list_filter = ('status', 'vehicle_type', 'fuel_type', 'transmission', 'is_featured')
+    search_fields = ('name', 'model', 'plate_number', 'pickup_location', 'dropoff_location')
 
 
 @admin.register(Document)
@@ -23,7 +32,17 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('customer', 'vehicle', 'start_date', 'end_date', 'total_amount', 'status', 'created_at')
+    list_display = (
+        'customer',
+        'vehicle',
+        'pickup_location',
+        'dropoff_location',
+        'start_date',
+        'end_date',
+        'total_amount',
+        'status',
+        'created_at',
+    )
     list_filter = ('status', 'start_date')
     search_fields = ('customer__user__username', 'vehicle__name')
 
