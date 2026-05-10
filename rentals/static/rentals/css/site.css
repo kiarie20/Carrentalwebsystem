@@ -334,6 +334,10 @@ main {
     line-height: 1.7;
 }
 
+.compact-heading {
+    margin-bottom: 18px;
+}
+
 .centered {
     text-align: center;
 }
@@ -494,6 +498,17 @@ main {
     gap: 28px;
 }
 
+.account-layout {
+    display: grid;
+    gap: 28px;
+}
+
+.account-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+}
+
 .listing-layout {
     grid-template-columns: 290px minmax(0, 1fr);
 }
@@ -602,6 +617,11 @@ main {
 .footer-grid,
 .booking-form-grid,
 .auth-card-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.booking-history {
     display: grid;
     gap: 18px;
 }
@@ -738,6 +758,30 @@ main {
     padding: 32px 0 72px;
 }
 
+.bookings-panel {
+    margin-top: 6px;
+}
+
+.booking-history-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 22px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+}
+
+.booking-history-card h3 {
+    margin: 0 0 8px;
+}
+
+.booking-history-card p,
+.booking-history-card span {
+    color: var(--muted);
+}
+
 .auth-layout {
     display: grid;
     grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -823,7 +867,8 @@ main {
     .auth-layout,
     .listing-layout,
     .detail-layout,
-    .booking-layout {
+    .booking-layout,
+    .account-grid {
         grid-template-columns: 1fr;
     }
 
@@ -876,7 +921,12 @@ main {
     .footer-grid,
     .booking-form-grid,
     .auth-card-grid,
-    .thumbnail-row {
+    .thumbnail-row,
+    .booking-history {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-history-card {
         grid-template-columns: 1fr;
     }
 

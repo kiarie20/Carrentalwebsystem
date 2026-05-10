@@ -3,6 +3,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
+from .models import Customer, Document
+
 
 class BookingForm(forms.Form):
     pickup_location = forms.CharField(max_length=120)
@@ -76,3 +78,15 @@ class CustomerLoginForm(forms.Form):
 
     def get_user(self):
         return self.user
+
+
+class CustomerProfileForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ('phone', 'national_id_number', 'address')
+
+
+class DocumentUploadForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ('national_id_file', 'driver_license_file')

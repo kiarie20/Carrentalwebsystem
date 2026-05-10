@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}RIRI Car Rentals | My Account{% endblock %}
+
+{% block content %}
+<section class="page-section shell account-layout">
+    <div class="section-heading">
+        <h1>My Account</h1>
+        <p>Manage your profile, upload verification documents, and review your recent bookings.</p>
+    </div>
+
+    <div class="account-grid">
+        <section class="content-panel">
+            <h2>Profile Details</h2>
+            <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="profile">
+                <div class="field-group">
+                    <label>Email Address</label>
+                    <input type="text" value="{{ request.user.email|default:request.user.username }}" disabled>
+                </div>
+                <div class="field-group">
+                    <label for="{{ profile_form.phone.id_for_label }}">Phone Number</label>
+                    {{ profile_form.phone }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ profile_form.national_id_number.id_for_label }}">National ID Number</label>
+                    {{ profile_form.national_id_number }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ profile_form.address.id_for_label }}">Address</label>
+                    {{ profile_form.address }}
+                </div>
+                {% if profile_form.errors %}
+                    <div class="form-errors">
+                        {% for field in profile_form %}
+                            {% for error in field.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <button class="primary-button" type="submit">Save Profile</button>
+            </form>
+        </section>
+
+        <section class="content-panel">
+            <div class="section-heading compact-heading">
+                <h2>Document Verification</h2>
+                <p>Status:
+                    <span class="status-pill {% if document and document.verification_status == 'Approved' %}status-available{% else %}status-busy{% endif %}">
+                        {% if document %}{{ document.verification_status }}{% else %}Missing{% endif %}
+                    </span>
+                </p>
+            </div>
+            <form method="post" enctype="multipart/form-data" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="documents">
+                <div class="field-group">
+                    <label for="{{ document_form.national_id_file.id_for_label }}">National ID File</label>
+                    {{ document_form.national_id_file }}
+                </div>
+                <div class="field-group">
+                    <label for="{{ document_form.driver_license_file.id_for_label }}">Driver License File</label>
+                    {{ document_form.driver_license_file }}
+                </div>
+                {% if document_form.errors %}
+                    <div class="form-errors">
+                        {% for field in document_form %}
+                            {% for error in field.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <button class="primary-button" type="submit">Upload Documents</button>
+            </form>
+        </section>
+    </div>
+
+    <section class="content-panel bookings-panel">
+        <div class="section-heading compact-heading">
+            <h2>Recent Bookings</h2>
+            <p>Keep track of the status of your current and past rentals.</p>
+        </div>
+
+        {% if bookings %}
+            <div class="booking-history">
+                {% for booking in bookings %}
+                    <article class="booking-history-card">
+                        <div>
+                            <h3>{{ booking.vehicle.name }}</h3>
+                            <p>{{ booking.pickup_location }} to {{ booking.dropoff_location }}</p>
+                        </div>
+                        <div>
+                            <span>{{ booking.start_date }} to {{ booking.end_date }}</span>
+                            <strong>KES {{ booking.total_amount }}</strong>
+                        </div>
+                        <span class="status-pill {% if booking.status == 'Confirmed' or booking.status == 'Completed' %}status-available{% else %}status-busy{% endif %}">
+                            {{ booking.status }}
+                        </span>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-card">
+                <h3>No bookings yet</h3>
+                <p>Your confirmed and pending bookings will appear here once you reserve a vehicle.</p>
+            </div>
+        {% endif %}
+    </section>
+</section>
+{% endblock %}

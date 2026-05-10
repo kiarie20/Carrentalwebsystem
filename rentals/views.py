@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
@@ -10,7 +11,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .demo import ensure_demo_vehicles
-from .forms import BookingForm, CustomerLoginForm, CustomerRegistrationForm
+from .forms import (
+    BookingForm,
+    CustomerLoginForm,
+    CustomerProfileForm,
+    CustomerRegistrationForm,
+    DocumentUploadForm,
+)
 from .models import Booking, Customer, DeliveryAgreement, Document, Payment, Vehicle
 
 
@@ -179,6 +186,8 @@ def auth_page(request):
                     address='Nairobi, Kenya',
                 )
                 login(request, user)
+                if next_url == reverse('home'):
+                    return redirect('account_dashboard')
                 return redirect(next_url)
 
     context = {
@@ -195,6 +204,54 @@ def auth_page(request):
 def logout_user(request):
     logout(request)
     return redirect('home')
+
+
+@login_required(login_url='auth_page')
+def account_dashboard(request):
+    customer, _ = Customer.objects.get_or_create(
+        user=request.user,
+        defaults={'phone': '', 'national_id_number': '', 'address': 'Nairobi, Kenya'},
+    )
+    document = Document.objects.filter(customer=customer).first()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'profile':
+            profile_form = CustomerProfileForm(request.POST, instance=customer)
+            document_form = DocumentUploadForm(instance=document)
+            if profile_form.is_valid():
+                profile_form.save()
+                return redirect('account_dashboard')
+        elif action == 'documents':
+            document_form = DocumentUploadForm(
+                request.POST,
+                request.FILES,
+                instance=document,
+            )
+            profile_form = CustomerProfileForm(instance=customer)
+            if document_form.is_valid():
+                uploaded_document = document_form.save(commit=False)
+                uploaded_document.customer = customer
+                uploaded_document.verification_status = 'Pending'
+                uploaded_document.save()
+                return redirect('account_dashboard')
+        else:
+            profile_form = CustomerProfileForm(instance=customer)
+            document_form = DocumentUploadForm(instance=document)
+    else:
+        profile_form = CustomerProfileForm(instance=customer)
+        document_form = DocumentUploadForm(instance=document)
+
+    bookings = Booking.objects.filter(customer=customer).select_related('vehicle').order_by('-created_at')
+    context = {
+        'active_page': 'account',
+        'customer': customer,
+        'document': document,
+        'profile_form': profile_form,
+        'document_form': document_form,
+        'bookings': bookings,
+    }
+    return render(request, 'account_dashboard.html', context)
 
 
 def book_vehicle(request, vehicle_id):

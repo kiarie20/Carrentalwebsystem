@@ -27,6 +27,7 @@
             <div class="nav-actions">
                 <span class="nav-phone">+254 700 123 456</span>
                 {% if request.user.is_authenticated %}
+                    <a class="ghost-button" href="{% url 'account_dashboard' %}">Dashboard</a>
                     <a class="ghost-button" href="{% url 'logout_user' %}">Logout</a>
                 {% else %}
                     <a class="ghost-button" href="{% url 'auth_page' %}">Login</a>

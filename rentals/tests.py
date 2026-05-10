@@ -137,3 +137,26 @@ class BookingWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('auth_page'), response.url)
+
+    def test_account_dashboard_requires_login(self):
+        response = self.client.get(reverse('account_dashboard'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('auth_page'), response.url)
+
+    def test_document_upload_resets_status_to_pending(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        Document.objects.filter(customer=self.customer).update(verification_status='Approved')
+
+        response = self.client.post(
+            reverse('account_dashboard'),
+            {
+                'action': 'documents',
+                'national_id_file': SimpleUploadedFile('updated-id.pdf', b'new-id'),
+                'driver_license_file': SimpleUploadedFile('updated-dl.pdf', b'new-dl'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        document = Document.objects.get(customer=self.customer)
+        self.assertEqual(document.verification_status, 'Pending')

@@ -53,6 +53,9 @@
                 <div class="alert-card">
                     <strong>Document status:</strong>
                     <p>{{ document_status }}</p>
+                    {% if document_status != 'Approved' %}
+                        <a class="text-link" href="{% url 'account_dashboard' %}">Go to Dashboard to update documents</a>
+                    {% endif %}
                 </div>
             {% endif %}
 

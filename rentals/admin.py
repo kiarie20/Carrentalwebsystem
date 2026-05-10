@@ -28,6 +28,15 @@ class VehicleAdmin(admin.ModelAdmin):
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ('customer', 'verification_status', 'uploaded_at')
     list_filter = ('verification_status',)
+    actions = ('approve_documents', 'reject_documents')
+
+    @admin.action(description='Approve selected documents')
+    def approve_documents(self, request, queryset):
+        queryset.update(verification_status='Approved')
+
+    @admin.action(description='Reject selected documents')
+    def reject_documents(self, request, queryset):
+        queryset.update(verification_status='Rejected')
 
 
 @admin.register(Booking)
