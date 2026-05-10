@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -355,3 +356,89 @@ def book_vehicle(request, vehicle_id):
             context['document_status'] = document.verification_status if document else 'Missing'
 
     return render(request, 'booking.html', context)
+
+
+def serialize_vehicle(vehicle):
+    return {
+        'id': vehicle.id,
+        'name': vehicle.name,
+        'model': vehicle.model,
+        'plate_number': vehicle.plate_number,
+        'vehicle_type': vehicle.vehicle_type,
+        'transmission': vehicle.transmission,
+        'fuel_type': vehicle.fuel_type,
+        'seat_count': vehicle.seat_count,
+        'door_count': vehicle.door_count,
+        'year': vehicle.year,
+        'mileage': vehicle.mileage,
+        'engine_size': vehicle.engine_size,
+        'drive_type': vehicle.drive_type,
+        'pickup_location': vehicle.pickup_location,
+        'dropoff_location': vehicle.dropoff_location,
+        'rating': str(vehicle.rating),
+        'review_count': vehicle.review_count,
+        'price_per_day': str(vehicle.price_per_day),
+        'status': vehicle.status,
+        'next_available_date': vehicle.next_available_date.isoformat() if vehicle.next_available_date else None,
+        'description': vehicle.description,
+        'image': vehicle.image.url if vehicle.image else None,
+    }
+
+
+def api_vehicle_list(request):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    vehicles = Vehicle.objects.all()
+    query = request.GET.get('q', '').strip()
+    vehicle_type = request.GET.get('type', '').strip()
+    status = request.GET.get('status', '').strip()
+
+    if query:
+        vehicles = vehicles.filter(
+            Q(name__icontains=query)
+            | Q(model__icontains=query)
+            | Q(description__icontains=query)
+        )
+    if vehicle_type:
+        vehicles = vehicles.filter(vehicle_type=vehicle_type)
+    if status:
+        vehicles = vehicles.filter(status=status)
+
+    data = [serialize_vehicle(vehicle) for vehicle in vehicles.order_by('price_per_day')]
+    return JsonResponse({'count': len(data), 'results': data})
+
+
+def api_vehicle_detail(request, vehicle_id):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    vehicle = get_object_or_404(Vehicle, id=vehicle_id)
+    return JsonResponse(serialize_vehicle(vehicle))
+
+
+@login_required(login_url='auth_page')
+def api_my_bookings(request):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    customer = Customer.objects.filter(user=request.user).first()
+    if not customer:
+        return JsonResponse({'count': 0, 'results': []})
+
+    bookings = Booking.objects.filter(customer=customer).select_related('vehicle').order_by('-created_at')
+    data = [
+        {
+            'id': booking.id,
+            'vehicle': serialize_vehicle(booking.vehicle),
+            'pickup_location': booking.pickup_location,
+            'dropoff_location': booking.dropoff_location,
+            'start_date': booking.start_date.isoformat(),
+            'end_date': booking.end_date.isoformat(),
+            'total_amount': str(booking.total_amount),
+            'status': booking.status,
+            'created_at': booking.created_at.isoformat(),
+        }
+        for booking in bookings
+    ]
+    return JsonResponse({'count': len(data), 'results': data})

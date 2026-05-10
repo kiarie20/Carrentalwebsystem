@@ -160,3 +160,38 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         document = Document.objects.get(customer=self.customer)
         self.assertEqual(document.verification_status, 'Pending')
+
+
+class ApiTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='apiuser@example.com', password='pass12345')
+        self.customer = Customer.objects.create(
+            user=self.user,
+            phone='0700000000',
+            national_id_number='99887766',
+            address='Nairobi',
+        )
+        self.vehicle = Vehicle.objects.create(
+            name='Honda Fit',
+            model='Hybrid',
+            plate_number='KDD 001X',
+            vehicle_type='Hatchback',
+            transmission='Automatic',
+            fuel_type='Hybrid',
+            price_per_day=Decimal('3000.00'),
+            status='Available',
+        )
+
+    def test_api_vehicle_list_returns_results(self):
+        response = self.client.get(reverse('api_vehicle_list'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['count'], 1)
+        self.assertEqual(payload['results'][0]['name'], 'Honda Fit')
+
+    def test_api_my_bookings_requires_auth(self):
+        response = self.client.get(reverse('api_my_bookings'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('auth_page'), response.url)
