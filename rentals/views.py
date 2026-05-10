@@ -82,13 +82,21 @@ def home(request):
     if not featured:
         featured = list(Vehicle.objects.order_by('price_per_day')[:4])
     hero_vehicle = featured[1] if len(featured) > 1 else (featured[0] if featured else None)
+    cheapest_vehicle = Vehicle.objects.order_by('price_per_day').first()
     vehicle_types = Vehicle.objects.exclude(vehicle_type='').values_list('vehicle_type', flat=True).distinct()
+    home_stats = [
+        {'label': 'Vehicles Ready', 'value': Vehicle.objects.filter(status='Available').count()},
+        {'label': 'Fleet Size', 'value': Vehicle.objects.count()},
+        {'label': 'From Per Day', 'value': f"KES {cheapest_vehicle.price_per_day}" if cheapest_vehicle else 'KES 0'},
+    ]
     context = {
         'active_page': 'home',
         'hero_vehicle': hero_vehicle,
         'featured_vehicles': featured,
         'benefits': BENEFITS,
         'vehicle_types': vehicle_types,
+        'hero_features': build_vehicle_features(hero_vehicle)[:4] if hero_vehicle else [],
+        'home_stats': home_stats,
     }
     return render(request, 'home.html', context)
 

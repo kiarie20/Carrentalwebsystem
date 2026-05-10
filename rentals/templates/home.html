@@ -3,56 +3,119 @@
 {% block title %}RIRI Car Rentals | Home{% endblock %}
 
 {% block content %}
-<section class="hero-section">
-    <div class="shell hero-grid">
-        <div class="hero-copy">
-            <span class="eyebrow">Premium Car Rentals</span>
-            <h1>Find The Perfect Car For Your <span>Journey</span></h1>
-            <p>Reliable, affordable and hassle-free car rentals for every trip, occasion, and schedule.</p>
-            <div class="hero-actions">
-                <a class="primary-button" href="{% url 'car_list' %}">Book Now</a>
-                <a class="ghost-button light" href="{% url 'auth_page' %}">Login or Register</a>
-            </div>
+<section class="hero-section home-hero">
+    {% if hero_vehicle and hero_vehicle.image %}
+        <div class="hero-backdrop">
+            <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
         </div>
-        <div class="hero-visual">
-            {% if hero_vehicle and hero_vehicle.image %}
-                <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+    {% endif %}
+    <div class="hero-scrim"></div>
+
+    <div class="shell hero-stage">
+        <div class="hero-grid home-hero-grid">
+            <div class="hero-copy">
+                <span class="eyebrow">Premium Car Rentals</span>
+                <h1>Find The Perfect Car For Every <span>Journey</span></h1>
+                <p>Reliable vehicles, transparent pricing, and fast booking designed for city rides, airport pickups, and long-distance trips across Kenya.</p>
+                <div class="hero-actions">
+                    <a class="primary-button" href="{% url 'car_list' %}">Explore Fleet</a>
+                    <a class="ghost-button light" href="{% url 'auth_page' %}">Create Account</a>
+                </div>
+            </div>
+
+            {% if hero_vehicle %}
+                <aside class="hero-spotlight">
+                    <div class="hero-spotlight-media">
+                        {% if hero_vehicle.image %}
+                            <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+                        {% endif %}
+                    </div>
+                    <div class="hero-spotlight-body">
+                        <div class="vehicle-topline">
+                            <h2>{{ hero_vehicle.name }}</h2>
+                            <span class="status-pill {% if hero_vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
+                                {{ hero_vehicle.status }}
+                            </span>
+                        </div>
+                        <p class="vehicle-meta">{{ hero_vehicle.vehicle_type }} . {{ hero_vehicle.transmission }} . {{ hero_vehicle.fuel_type }}</p>
+                        <div class="vehicle-price-row spotlight-price">
+                            <strong>KES {{ hero_vehicle.price_per_day }}</strong>
+                            <span>{{ hero_vehicle.rating }}/5 ({{ hero_vehicle.review_count }})</span>
+                        </div>
+                        <div class="hero-feature-list">
+                            {% for feature in hero_features %}
+                                <span>{{ feature }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="vehicle-actions-row">
+                            <a class="secondary-button" href="{% url 'car_detail' hero_vehicle.id %}">View Details</a>
+                            <a class="primary-button" href="{% url 'book_vehicle' hero_vehicle.id %}">Book This Car</a>
+                        </div>
+                    </div>
+                </aside>
             {% endif %}
         </div>
+
+        <div class="hero-stats-grid">
+            {% for stat in home_stats %}
+                <article class="hero-stat-card">
+                    <strong>{{ stat.value }}</strong>
+                    <span>{{ stat.label }}</span>
+                </article>
+            {% endfor %}
+        </div>
+
+        <form class="search-card home-search-card" method="get" action="{% url 'car_list' %}">
+            <div class="field-group">
+                <label for="pickup_location">Pick-up Location</label>
+                <input id="pickup_location" name="q" type="text" placeholder="Enter town, airport, or area">
+            </div>
+            <div class="field-group">
+                <label for="start_date">Pick-up Date</label>
+                <input id="start_date" name="start_date" type="date">
+            </div>
+            <div class="field-group">
+                <label for="end_date">Drop-off Date</label>
+                <input id="end_date" name="end_date" type="date">
+            </div>
+            <div class="field-group">
+                <label for="vehicle_type">Vehicle Type</label>
+                <select id="vehicle_type" name="type">
+                    <option value="">All Types</option>
+                    {% for item in vehicle_types %}
+                        <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="primary-button search-submit" type="submit">Search Cars</button>
+        </form>
     </div>
 </section>
 
-<section class="search-band shell">
-    <form class="search-card" method="get" action="{% url 'car_list' %}">
-        <div class="field-group">
-            <label for="pickup_location">Pick-up Location</label>
-            <input id="pickup_location" name="q" type="text" placeholder="Select location">
-        </div>
-        <div class="field-group">
-            <label for="start_date">Pick-up Date</label>
-            <input id="start_date" name="start_date" type="date">
-        </div>
-        <div class="field-group">
-            <label for="end_date">Drop-off Date</label>
-            <input id="end_date" name="end_date" type="date">
-        </div>
-        <div class="field-group">
-            <label for="vehicle_type">Vehicle Type</label>
-            <select id="vehicle_type" name="type">
-                <option value="">All Types</option>
+<section class="home-story shell">
+    <div class="story-layout">
+        <article class="story-card story-card-dark">
+            <span class="eyebrow soft-eyebrow">Why Travelers Choose Us</span>
+            <h2>Booking that feels clear, fast, and dependable.</h2>
+            <p>We focus on clean vehicles, responsive support, and a booking process that keeps the important details visible from the first click.</p>
+        </article>
+
+        <article class="story-card story-card-light">
+            <h3>Popular vehicle types</h3>
+            <div class="category-chip-row">
                 {% for item in vehicle_types %}
-                    <option value="{{ item }}">{{ item }}</option>
+                    <span class="category-chip">{{ item }}</span>
                 {% endfor %}
-            </select>
-        </div>
-        <button class="primary-button search-submit" type="submit">Search Cars</button>
-    </form>
+            </div>
+            <p>Browse sedans for city travel, SUVs for family or group trips, and premium options for business and executive bookings.</p>
+        </article>
+    </div>
 </section>
 
 <section class="benefits-section shell" id="services">
     <div class="section-heading centered">
-        <h2>Why Choose RIRI Car Rentals?</h2>
-        <p>Built for smooth booking, flexible travel, and dependable support from start to finish.</p>
+        <h2>What You Get With RIRI</h2>
+        <p>Every booking is backed by clear pricing, customer support, and a fleet prepared for real travel needs.</p>
     </div>
     <div class="benefit-grid">
         {% for benefit in benefits %}
@@ -70,8 +133,8 @@
 <section class="cars-preview shell">
     <div class="section-heading with-action">
         <div>
-            <h2>Popular Vehicles</h2>
-            <p>Browse our most booked and most loved vehicles.</p>
+            <h2>Featured Fleet</h2>
+            <p>Vehicles chosen to give customers a quick view of our most in-demand options.</p>
         </div>
         <a href="{% url 'car_list' %}" class="text-link">View All Cars</a>
     </div>

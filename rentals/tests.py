@@ -15,7 +15,7 @@ class PublicPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertGreater(Vehicle.objects.count(), 0)
-        self.assertContains(response, 'Popular Vehicles')
+        self.assertContains(response, 'Featured Fleet')
 
 
 class BookingWorkflowTests(TestCase):
