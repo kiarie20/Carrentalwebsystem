@@ -99,7 +99,7 @@ class CustomerAccountApiForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.user and not self.is_bound:
             self.fields['full_name'].initial = self.user.first_name
-            self.fields['email'].initial = self.user.email
+            self.fields['email'].initial = self.user.email or self.user.username
 
     def clean_email(self):
         email = self.cleaned_data['email'].strip().lower()

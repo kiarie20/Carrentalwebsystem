@@ -439,7 +439,7 @@ def api_my_profile(request):
         return JsonResponse(
             {
                 'username': request.user.username,
-                'email': request.user.email,
+                'email': request.user.email or request.user.username,
                 'full_name': request.user.first_name,
                 'phone': customer.phone,
                 'national_id_number': customer.national_id_number,
