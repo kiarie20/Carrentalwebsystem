@@ -5,6 +5,24 @@
 
 {% block content %}
 <section class="page-section shell listing-layout">
+    <div class="page-hero-panel listing-hero-panel">
+        <div>
+            <span class="section-kicker">Curated Fleet</span>
+            <h1>Available Cars</h1>
+            <p>Browse executive, family, SUV, and city-ready rentals with transparent pricing and flexible pick-up options across Nairobi.</p>
+        </div>
+        <div class="page-hero-aside">
+            <article class="page-hero-metric">
+                <strong>{{ result_count }}</strong>
+                <span>Cars matching your current filters</span>
+            </article>
+            <article class="page-hero-metric">
+                <strong>{{ vehicle_types|length }}</strong>
+                <span>Vehicle categories available</span>
+            </article>
+        </div>
+    </div>
+
     <aside class="filter-panel">
         <h2>Filter Cars</h2>
         <form method="get" class="filter-form">
@@ -54,7 +72,7 @@
 
     <div class="listing-main">
         <div class="section-heading">
-            <h1>Available Cars</h1>
+            <h2>Browse The Fleet</h2>
             <p>Showing {{ result_count }} vehicle{{ result_count|pluralize }} tailored to your current filters.</p>
         </div>
 
