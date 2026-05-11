@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | My Account{% endblock %}
 
@@ -94,7 +95,7 @@
                         </div>
                         <div>
                             <span>{{ booking.start_date }} to {{ booking.end_date }}</span>
-                            <strong>KES {{ booking.total_amount }}</strong>
+                            <strong>KES {{ booking.total_amount|floatformat:0|intcomma }}</strong>
                         </div>
                         <span class="status-pill {% if booking.status == 'Confirmed' or booking.status == 'Completed' %}status-available{% else %}status-busy{% endif %}">
                             {{ booking.status }}

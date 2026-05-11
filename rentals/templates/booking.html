@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | Booking{% endblock %}
 
@@ -20,13 +21,13 @@
 
         <div class="content-panel">
             <div class="booking-vehicle">
-                {% if vehicle.image %}
-                    <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                {% if vehicle.primary_image_url %}
+                    <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
                 {% endif %}
                 <div>
                     <h2>{{ vehicle.name }}</h2>
                     <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
-                    <strong class="detail-price">KES {{ vehicle.price_per_day }} <span>/ day</span></strong>
+                    <strong class="detail-price">KES {{ vehicle.price_per_day|floatformat:0|intcomma }} <span>/ day</span></strong>
                 </div>
             </div>
 
@@ -37,7 +38,7 @@
             {% if success %}
                 <div class="alert-card alert-success">
                     <strong>{{ success }}</strong>
-                    <p>Booking ID: {{ booking.id }} | Status: {{ booking.status }} | Total: KES {{ booking.total_amount }}</p>
+                    <p>Booking ID: {{ booking.id }} | Status: {{ booking.status }} | Total: KES {{ booking.total_amount|floatformat:0|intcomma }}</p>
                 </div>
             {% endif %}
 
@@ -91,7 +92,7 @@
         <div class="pricing-panel">
             <div class="pricing-row">
                 <span>Daily Rate</span>
-                <strong>KES {{ vehicle.price_per_day }}</strong>
+                <strong>KES {{ vehicle.price_per_day|floatformat:0|intcomma }}</strong>
             </div>
             <div class="pricing-row">
                 <span>Total Days</span>
@@ -99,11 +100,11 @@
             </div>
             <div class="pricing-row">
                 <span>Taxes & Fees</span>
-                <strong>KES {{ pricing.taxes }}</strong>
+                <strong>KES {{ pricing.taxes|floatformat:0|intcomma }}</strong>
             </div>
             <div class="pricing-row total-row">
                 <span>Total Amount</span>
-                <strong>KES {{ pricing.total }}</strong>
+                <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
             </div>
         </div>
     </div>
@@ -118,7 +119,7 @@
                             <strong>{{ extra.name }}</strong>
                             <p>{{ extra.description }}</p>
                         </div>
-                        <span>KES {{ extra.price }} / day</span>
+                        <span>KES {{ extra.price|floatformat:0|intcomma }} / day</span>
                     </article>
                 {% endfor %}
             </div>

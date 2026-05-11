@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | Cars{% endblock %}
 
@@ -61,8 +62,8 @@
             {% for vehicle in page_obj.object_list %}
                 <article class="vehicle-card">
                     <a href="{% url 'car_detail' vehicle.id %}" class="vehicle-image-wrap">
-                        {% if vehicle.image %}
-                            <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                        {% if vehicle.primary_image_url %}
+                            <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
                         {% endif %}
                     </a>
                     <div class="vehicle-card-body">
@@ -74,7 +75,7 @@
                         </div>
                         <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
                         <div class="vehicle-price-row">
-                            <strong>KES {{ vehicle.price_per_day }}</strong>
+                            <strong>KES {{ vehicle.price_per_day|floatformat:0|intcomma }}</strong>
                             <span>{{ vehicle.rating }}/5 ({{ vehicle.review_count }})</span>
                         </div>
                         <div class="vehicle-actions-row">

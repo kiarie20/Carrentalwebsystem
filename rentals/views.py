@@ -395,7 +395,7 @@ def serialize_vehicle(vehicle):
         'status': vehicle.status,
         'next_available_date': vehicle.next_available_date.isoformat() if vehicle.next_available_date else None,
         'description': vehicle.description,
-        'image': vehicle.image.url if vehicle.image else None,
+        'image': vehicle.primary_image_url,
     }
 
 

@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | Home{% endblock %}
 
 {% block content %}
 <section class="hero-section home-hero">
-    {% if hero_vehicle and hero_vehicle.image %}
+    {% if hero_vehicle and hero_vehicle.primary_image_url %}
         <div class="hero-backdrop">
-            <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+            <img src="{{ hero_vehicle.primary_image_url }}" alt="{{ hero_vehicle.name }}">
         </div>
     {% endif %}
     <div class="hero-scrim"></div>
@@ -26,8 +27,8 @@
             {% if hero_vehicle %}
                 <aside class="hero-spotlight">
                     <div class="hero-spotlight-media">
-                        {% if hero_vehicle.image %}
-                            <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+                        {% if hero_vehicle.primary_image_url %}
+                            <img src="{{ hero_vehicle.primary_image_url }}" alt="{{ hero_vehicle.name }}">
                         {% endif %}
                     </div>
                     <div class="hero-spotlight-body">
@@ -39,7 +40,7 @@
                         </div>
                         <p class="vehicle-meta">{{ hero_vehicle.vehicle_type }} . {{ hero_vehicle.transmission }} . {{ hero_vehicle.fuel_type }}</p>
                         <div class="vehicle-price-row spotlight-price">
-                            <strong>KES {{ hero_vehicle.price_per_day }}</strong>
+                            <strong>KES {{ hero_vehicle.price_per_day|floatformat:0|intcomma }}</strong>
                             <span>{{ hero_vehicle.rating }}/5 ({{ hero_vehicle.review_count }})</span>
                         </div>
                         <div class="hero-feature-list">
@@ -142,8 +143,8 @@
         {% for vehicle in featured_vehicles %}
             <article class="vehicle-card">
                 <a href="{% url 'car_detail' vehicle.id %}" class="vehicle-image-wrap">
-                    {% if vehicle.image %}
-                        <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                    {% if vehicle.primary_image_url %}
+                        <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
                     {% endif %}
                 </a>
                 <div class="vehicle-card-body">
@@ -155,7 +156,7 @@
                     </div>
                     <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
                     <div class="vehicle-price-row">
-                        <strong>KES {{ vehicle.price_per_day }}</strong>
+                        <strong>KES {{ vehicle.price_per_day|floatformat:0|intcomma }}</strong>
                         <span>{{ vehicle.rating }}/5 ({{ vehicle.review_count }})</span>
                     </div>
                     <div class="vehicle-actions-row">

@@ -43,10 +43,17 @@ class Vehicle(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Available')
     next_available_date = models.DateField(blank=True, null=True)
     image = models.ImageField(upload_to='vehicles/', blank=True, null=True)
+    image_url = models.URLField(blank=True)
     description = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.name} - {self.plate_number}"
+
+    @property
+    def primary_image_url(self):
+        if self.image:
+            return self.image.url
+        return self.image_url
 
     def refresh_availability(self):
         active_bookings = self.booking_set.filter(status__in=['Pending', 'Confirmed'])

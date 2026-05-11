@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | Login or Register{% endblock %}
 
@@ -6,8 +7,8 @@
 <section class="auth-section shell">
     <div class="auth-layout">
         <div class="auth-visual">
-            {% if hero_vehicle and hero_vehicle.image %}
-                <img src="{{ hero_vehicle.image.url }}" alt="{{ hero_vehicle.name }}">
+            {% if hero_vehicle and hero_vehicle.primary_image_url %}
+                <img src="{{ hero_vehicle.primary_image_url }}" alt="{{ hero_vehicle.name }}">
             {% endif %}
             <div class="auth-overlay">
                 <span class="eyebrow">RIRI Car Rentals</span>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}RIRI Car Rentals | {{ vehicle.name }}{% endblock %}
 
@@ -14,16 +15,16 @@
         </nav>
 
         <div class="detail-hero-card">
-            {% if vehicle.image %}
-                <img class="detail-hero-image" src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+            {% if vehicle.primary_image_url %}
+                <img class="detail-hero-image" src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
             {% endif %}
         </div>
 
         <div class="thumbnail-row">
             {% for item in gallery_items %}
                 <div class="thumbnail-card">
-                    {% if vehicle.image %}
-                        <img src="{{ vehicle.image.url }}" alt="{{ vehicle.name }}">
+                    {% if vehicle.primary_image_url %}
+                        <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
                     {% endif %}
                 </div>
             {% endfor %}
@@ -68,8 +69,8 @@
                     {% for item in related_vehicles %}
                         <article class="vehicle-card">
                             <a href="{% url 'car_detail' item.id %}" class="vehicle-image-wrap">
-                                {% if item.image %}
-                                    <img src="{{ item.image.url }}" alt="{{ item.name }}">
+                                {% if item.primary_image_url %}
+                                    <img src="{{ item.primary_image_url }}" alt="{{ item.name }}">
                                 {% endif %}
                             </a>
                             <div class="vehicle-card-body">
@@ -91,7 +92,7 @@
             <h1>{{ vehicle.name }}</h1>
             <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
             <div class="rating-row">{{ vehicle.rating }}/5 ({{ vehicle.review_count }} reviews)</div>
-            <div class="detail-price">KES {{ vehicle.price_per_day }} <span>/ day</span></div>
+            <div class="detail-price">KES {{ vehicle.price_per_day|floatformat:0|intcomma }} <span>/ day</span></div>
             <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
                 {{ vehicle.status }}
             </span>
@@ -110,7 +111,7 @@
                 </div>
                 <div>
                     <span>Estimated Total</span>
-                    <strong>KES {{ pricing.total }}</strong>
+                    <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
                 </div>
             </div>
             <a class="primary-button full-width" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
