@@ -4,8 +4,8 @@
 {% block title %}RIRI Car Rentals | {{ vehicle.name }}{% endblock %}
 
 {% block content %}
-<section class="page-section shell detail-layout">
-    <div class="detail-main">
+<section class="page-section shell">
+    <div class="detail-main detail-flow-stack">
         <nav class="breadcrumbs">
             <a href="{% url 'home' %}">Home</a>
             <span>/</span>
@@ -29,6 +29,42 @@
                 </div>
             {% endfor %}
         </div>
+
+        <section class="content-panel">
+            <div class="detail-summary-panel">
+                <div class="detail-summary-copy">
+                    <h1>{{ vehicle.name }}</h1>
+                    <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
+                    <div class="rating-row">{{ vehicle.rating }}/5 ({{ vehicle.review_count }} reviews)</div>
+                </div>
+                <div class="detail-summary-actions">
+                    <div class="detail-price">KES {{ vehicle.price_per_day|floatformat:0|intcomma }} <span>/ day</span></div>
+                    <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
+                        {{ vehicle.status }}
+                    </span>
+                    <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+                </div>
+            </div>
+
+            <div class="summary-grid detail-summary-grid">
+                <div>
+                    <span>Pick-up Location</span>
+                    <strong>{{ vehicle.pickup_location }}</strong>
+                </div>
+                <div>
+                    <span>Drop-off Location</span>
+                    <strong>{{ vehicle.dropoff_location }}</strong>
+                </div>
+                <div>
+                    <span>Sample Duration</span>
+                    <strong>{{ pricing.total_days }} Days</strong>
+                </div>
+                <div>
+                    <span>Estimated Total</span>
+                    <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
+                </div>
+            </div>
+        </section>
 
         <section class="content-panel">
             <div class="tab-row">
@@ -86,36 +122,5 @@
             </section>
         {% endif %}
     </div>
-
-    <aside class="detail-sidebar">
-        <div class="booking-summary sticky-card">
-            <h1>{{ vehicle.name }}</h1>
-            <p class="vehicle-meta">{{ vehicle.vehicle_type }} . {{ vehicle.transmission }} . {{ vehicle.fuel_type }}</p>
-            <div class="rating-row">{{ vehicle.rating }}/5 ({{ vehicle.review_count }} reviews)</div>
-            <div class="detail-price">KES {{ vehicle.price_per_day|floatformat:0|intcomma }} <span>/ day</span></div>
-            <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
-                {{ vehicle.status }}
-            </span>
-            <div class="summary-grid">
-                <div>
-                    <span>Pick-up Location</span>
-                    <strong>{{ vehicle.pickup_location }}</strong>
-                </div>
-                <div>
-                    <span>Drop-off Location</span>
-                    <strong>{{ vehicle.dropoff_location }}</strong>
-                </div>
-                <div>
-                    <span>Sample Duration</span>
-                    <strong>{{ pricing.total_days }} Days</strong>
-                </div>
-                <div>
-                    <span>Estimated Total</span>
-                    <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
-                </div>
-            </div>
-            <a class="primary-button full-width" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
-        </div>
-    </aside>
 </section>
 {% endblock %}

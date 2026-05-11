@@ -1,17 +1,20 @@
 :root {
-    --bg: #f4f7fb;
+    --bg: #f3f5f8;
     --surface: #ffffff;
-    --surface-soft: #f8fbff;
-    --line: #dbe4f0;
-    --text: #0f172a;
-    --muted: #5e6b84;
-    --nav: #08142e;
-    --primary: #1f5eff;
-    --primary-dark: #1447c6;
+    --surface-soft: #f7f8fb;
+    --line: #d6ddea;
+    --text: #101827;
+    --muted: #5f6d83;
+    --nav: #0a1220;
+    --primary: #2c66f0;
+    --primary-dark: #1c48bc;
+    --accent: #d4a64a;
+    --accent-strong: #a56d13;
+    --accent-soft: rgba(212, 166, 74, 0.14);
     --success: #1e9a5b;
     --warning: #d97706;
     --danger: #c2410c;
-    --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+    --shadow: 0 24px 56px rgba(16, 24, 39, 0.09);
     --radius-xl: 28px;
     --radius-lg: 20px;
     --radius-md: 14px;
@@ -29,7 +32,9 @@ html {
 body {
     margin: 0;
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+    background:
+        radial-gradient(circle at top left, rgba(212, 166, 74, 0.08), transparent 24%),
+        linear-gradient(180deg, #fafbfd 0%, var(--bg) 100%);
     color: var(--text);
 }
 
@@ -63,9 +68,9 @@ main {
     position: sticky;
     top: 0;
     z-index: 30;
-    background: rgba(8, 20, 46, 0.95);
+    background: rgba(10, 18, 32, 0.94);
     backdrop-filter: blur(18px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .nav-shell {
@@ -89,9 +94,10 @@ main {
     display: grid;
     place-items: center;
     border-radius: 14px;
-    background: linear-gradient(135deg, #245eff 0%, #5d95ff 100%);
+    background: linear-gradient(135deg, #2d61eb 0%, #6b95ff 72%, #d4a64a 140%);
     font-size: 1.5rem;
     font-weight: 700;
+    box-shadow: 0 14px 28px rgba(10, 18, 32, 0.24);
 }
 
 .brand strong,
@@ -134,7 +140,7 @@ main {
     bottom: -30px;
     height: 3px;
     border-radius: 999px;
-    background: var(--primary);
+    background: linear-gradient(90deg, var(--accent) 0%, var(--primary) 100%);
 }
 
 .nav-actions {
@@ -166,9 +172,9 @@ main {
 }
 
 .primary-button {
-    background: linear-gradient(135deg, var(--primary) 0%, #0f56ff 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, #4f88ff 100%);
     color: #fff;
-    box-shadow: 0 14px 28px rgba(31, 94, 255, 0.25);
+    box-shadow: 0 16px 32px rgba(44, 102, 240, 0.24);
 }
 
 .primary-button:hover,
@@ -181,6 +187,11 @@ main {
 .ghost-button {
     background: transparent;
     border-color: var(--line);
+}
+
+.secondary-button {
+    color: var(--primary-dark);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 248, 251, 0.95) 100%);
 }
 
 .ghost-button {
@@ -201,8 +212,9 @@ main {
     overflow: hidden;
     padding: 48px 0 140px;
     background:
-        radial-gradient(circle at top right, rgba(53, 113, 255, 0.24), transparent 34%),
-        linear-gradient(120deg, #07101e 0%, #0f2b55 48%, #0d1830 100%);
+        radial-gradient(circle at top left, rgba(212, 166, 74, 0.18), transparent 26%),
+        radial-gradient(circle at top right, rgba(70, 116, 255, 0.24), transparent 34%),
+        linear-gradient(120deg, #07101b 0%, #102444 44%, #0d182b 100%);
 }
 
 .home-hero {
@@ -224,8 +236,9 @@ main {
 
 .hero-scrim {
     background:
-        radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 30%),
-        linear-gradient(90deg, rgba(4, 11, 25, 0.92) 0%, rgba(7, 18, 38, 0.8) 44%, rgba(7, 18, 38, 0.58) 100%);
+        radial-gradient(circle at top left, rgba(212, 166, 74, 0.12), transparent 24%),
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 30%),
+        linear-gradient(90deg, rgba(4, 10, 21, 0.92) 0%, rgba(8, 19, 38, 0.82) 44%, rgba(7, 18, 38, 0.56) 100%);
 }
 
 .hero-stage {
@@ -255,9 +268,9 @@ main {
     min-height: 40px;
     padding: 0 18px;
     border-radius: 999px;
-    background: rgba(31, 94, 255, 0.2);
-    border: 1px solid rgba(146, 181, 255, 0.24);
-    color: #dce7ff;
+    background: rgba(212, 166, 74, 0.14);
+    border: 1px solid rgba(212, 166, 74, 0.24);
+    color: #fff3d8;
     font-weight: 700;
     margin-bottom: 22px;
 }
@@ -272,7 +285,7 @@ main {
 
 .hero-copy h1 span,
 .auth-overlay h1 span {
-    color: #3b82ff;
+    color: var(--accent);
 }
 
 .hero-copy p,
@@ -306,8 +319,8 @@ main {
     grid-template-columns: minmax(0, 1fr);
     overflow: hidden;
     border-radius: 28px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.08) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
     backdrop-filter: blur(12px);
 }
@@ -347,8 +360,8 @@ main {
     min-height: 34px;
     padding: 0 12px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(212, 166, 74, 0.2);
     color: #fff;
     font-size: 0.95rem;
     font-weight: 600;
@@ -364,8 +377,8 @@ main {
 .hero-stat-card {
     padding: 18px 20px;
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.06) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     color: #fff;
     backdrop-filter: blur(8px);
 }
@@ -429,6 +442,14 @@ main {
     padding: 16px;
 }
 
+.field-group input[type="file"] {
+    width: 100%;
+    max-width: 100%;
+    min-height: 58px;
+    padding: 10px 14px;
+    overflow: hidden;
+}
+
 .search-submit {
     align-self: end;
 }
@@ -461,6 +482,10 @@ main {
 
 .compact-heading {
     margin-bottom: 18px;
+}
+
+.booking-main .compact-heading h2 {
+    font-size: clamp(1.75rem, 2.8vw, 2.35rem);
 }
 
 .centered {
@@ -502,7 +527,7 @@ main {
 }
 
 .story-card-dark {
-    background: linear-gradient(135deg, #09172d 0%, #15386f 100%);
+    background: linear-gradient(135deg, #0b1526 0%, #183865 72%, #8c6c2f 148%);
     color: #fff;
 }
 
@@ -517,7 +542,7 @@ main {
 }
 
 .story-card-light {
-    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #faf8f2 100%);
 }
 
 .category-chip-row {
@@ -528,9 +553,9 @@ main {
 }
 
 .story-card-light .category-chip {
-    background: rgba(31, 94, 255, 0.08);
-    border-color: rgba(31, 94, 255, 0.12);
-    color: var(--primary);
+    background: var(--accent-soft);
+    border-color: rgba(212, 166, 74, 0.2);
+    color: var(--accent-strong);
 }
 
 .benefits-section,
@@ -568,8 +593,8 @@ main {
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: rgba(31, 94, 255, 0.1);
-    color: var(--primary);
+    background: linear-gradient(135deg, rgba(212, 166, 74, 0.16) 0%, rgba(44, 102, 240, 0.08) 100%);
+    color: var(--accent-strong);
     font-weight: 800;
 }
 
@@ -594,7 +619,7 @@ main {
 .vehicle-image-wrap {
     display: block;
     aspect-ratio: 16 / 10;
-    background: linear-gradient(135deg, #dfe9fb 0%, #f7fbff 100%);
+    background: linear-gradient(135deg, #e5ebf7 0%, #faf8f2 100%);
 }
 
 .vehicle-image-wrap img,
@@ -672,11 +697,17 @@ main {
 }
 
 .listing-layout,
-.detail-layout,
-.booking-layout {
+.detail-layout {
     display: grid;
     grid-template-columns: 320px minmax(0, 1fr);
     gap: 28px;
+}
+
+.booking-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.32fr) minmax(320px, 0.78fr);
+    gap: 28px;
+    align-items: start;
 }
 
 .account-layout {
@@ -698,6 +729,16 @@ main {
 .detail-main,
 .booking-main {
     min-width: 0;
+}
+
+.booking-flow-stack {
+    display: grid;
+    gap: 28px;
+}
+
+.detail-flow-stack {
+    display: grid;
+    gap: 28px;
 }
 
 .filter-panel,
@@ -791,6 +832,29 @@ main {
 
 .tab-row a.is-active {
     color: var(--primary);
+}
+
+.detail-summary-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 22px;
+}
+
+.detail-summary-copy h1 {
+    margin: 0 0 8px;
+    font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.detail-summary-actions {
+    display: grid;
+    justify-items: end;
+    gap: 14px;
+}
+
+.detail-summary-grid {
+    margin-top: 6px;
 }
 
 .icon-grid,
@@ -901,13 +965,23 @@ main {
     gap: 14px;
 }
 
+.booking-benefit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .extra-card {
     padding: 16px 18px;
 }
 
+.selected-extras-summary {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+}
+
 .benefit-stack.light .benefit-stack-item {
     background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(212, 166, 74, 0.16);
 }
 
 .benefit-stack.light .benefit-stack-item p,
@@ -1059,7 +1133,9 @@ main {
     margin-top: 52px;
     padding: 48px 0;
     color: rgba(255, 255, 255, 0.85);
-    background: #07101e;
+    background:
+        radial-gradient(circle at top left, rgba(212, 166, 74, 0.12), transparent 18%),
+        #07101c;
 }
 
 .site-footer h3,
@@ -1166,8 +1242,17 @@ main {
     .auth-card-grid,
     .thumbnail-row,
     .booking-history,
-    .hero-stats-grid {
+    .hero-stats-grid,
+    .booking-benefit-grid {
         grid-template-columns: 1fr;
+    }
+
+    .detail-summary-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-summary-actions {
+        justify-items: start;
     }
 
     .booking-history-card {

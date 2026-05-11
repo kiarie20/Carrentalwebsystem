@@ -4,8 +4,8 @@
 {% block title %}RIRI Car Rentals | Booking{% endblock %}
 
 {% block content %}
-<section class="page-section shell booking-layout">
-    <form method="post" enctype="multipart/form-data" class="booking-main" id="booking-form">
+<section class="page-section shell">
+    <form method="post" enctype="multipart/form-data" class="booking-main booking-flow-stack" id="booking-form">
         {% csrf_token %}
         <nav class="breadcrumbs">
             <a href="{% url 'home' %}">Home</a>
@@ -114,6 +114,62 @@
             </div>
         </div>
 
+        <div class="content-panel">
+            <div class="section-heading compact-heading">
+                <h2>Optional Extra Services</h2>
+                <p>Add any services you want included before we prepare your booking summary and payment.</p>
+            </div>
+            <div class="extras-list">
+                {% for extra in extra_services %}
+                    <article class="extra-card">
+                        <label class="extra-choice">
+                            <input
+                                type="checkbox"
+                                name="selected_extras"
+                                value="{{ extra.id }}"
+                                {% if extra.id|stringformat:"s" in selected_extra_ids %}checked{% endif %}
+                            >
+                            <div>
+                                <strong>{{ extra.name }}</strong>
+                                <p>{{ extra.description }}</p>
+                            </div>
+                        </label>
+                        <span>
+                            KES {{ extra.price|floatformat:0|intcomma }}
+                            {% if extra.pricing_mode == 'daily' %}/ day{% else %}one-time{% endif %}
+                        </span>
+                    </article>
+                {% endfor %}
+            </div>
+
+            {% if pricing.selected_extras %}
+                <div class="selected-extras-summary">
+                    <h3>Selected Extras</h3>
+                    {% for extra in pricing.selected_extras %}
+                        <div class="pricing-row">
+                            <span>{{ extra.name }}</span>
+                            <strong>KES {{ extra.total|floatformat:0|intcomma }}</strong>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="content-panel">
+            <div class="section-heading compact-heading">
+                <h2>Your Benefits</h2>
+                <p>Every booking still includes the support and protections below.</p>
+            </div>
+            <div class="benefit-stack booking-benefit-grid">
+                {% for benefit in benefits %}
+                    <div class="benefit-stack-item">
+                        <strong>{{ benefit.title }}</strong>
+                        <p>{{ benefit.copy }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div class="pricing-panel">
             <div class="pricing-row">
                 <span>Daily Rate</span>
@@ -142,57 +198,5 @@
             <button class="primary-button full-width" type="submit" name="action" value="booking">Proceed to Payment</button>
         </div>
     </form>
-
-    <aside class="booking-side">
-        <div class="content-panel sticky-card">
-            <h2>Extra Services</h2>
-            <p>Select the add-ons you want included in the rental agreement and final payment.</p>
-            <div class="extras-list">
-                {% for extra in extra_services %}
-                    <article class="extra-card">
-                        <label class="extra-choice">
-                            <input
-                                type="checkbox"
-                                name="selected_extras"
-                                value="{{ extra.id }}"
-                                form="booking-form"
-                                {% if extra.id|stringformat:"s" in selected_extra_ids %}checked{% endif %}
-                            >
-                            <div>
-                                <strong>{{ extra.name }}</strong>
-                                <p>{{ extra.description }}</p>
-                            </div>
-                        </label>
-                        <span>
-                            KES {{ extra.price|floatformat:0|intcomma }}
-                            {% if extra.pricing_mode == 'daily' %}/ day{% else %}one-time{% endif %}
-                        </span>
-                    </article>
-                {% endfor %}
-            </div>
-
-            {% if pricing.selected_extras %}
-                <div class="selected-extras-summary">
-                    <h3>Selected Extras</h3>
-                    {% for extra in pricing.selected_extras %}
-                        <div class="pricing-row">
-                            <span>{{ extra.name }}</span>
-                            <strong>KES {{ extra.total|floatformat:0|intcomma }}</strong>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            <h2>Your Benefits</h2>
-            <div class="benefit-stack">
-                {% for benefit in benefits %}
-                    <div class="benefit-stack-item">
-                        <strong>{{ benefit.title }}</strong>
-                        <p>{{ benefit.copy }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-    </aside>
 </section>
 {% endblock %}
