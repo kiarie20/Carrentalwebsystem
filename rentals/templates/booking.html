@@ -5,7 +5,8 @@
 
 {% block content %}
 <section class="page-section shell booking-layout">
-    <div class="booking-main">
+    <form method="post" class="booking-main" id="booking-form">
+        {% csrf_token %}
         <nav class="breadcrumbs">
             <a href="{% url 'home' %}">Home</a>
             <span>/</span>
@@ -60,8 +61,7 @@
                 </div>
             {% endif %}
 
-            <form method="post" class="booking-form-grid">
-                {% csrf_token %}
+            <div class="booking-form-grid">
                 <div class="field-group">
                     <label for="{{ form.pickup_location.id_for_label }}">Pick-up Location</label>
                     {{ form.pickup_location }}
@@ -79,14 +79,13 @@
                     {{ form.end_date }}
                 </div>
                 <div class="field-group field-span-2">
-                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (optional)</label>
+                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (required when a delivery service is selected)</label>
                     {{ form.delivery_location }}
                 </div>
                 {% if form.non_field_errors %}
                     <div class="field-span-2 form-errors">{{ form.non_field_errors }}</div>
                 {% endif %}
-                <button class="primary-button full-width field-span-2" type="submit">Proceed to Payment</button>
-            </form>
+            </div>
         </div>
 
         <div class="pricing-panel">
@@ -99,6 +98,14 @@
                 <strong>{{ pricing.total_days }}</strong>
             </div>
             <div class="pricing-row">
+                <span>Rental Subtotal</span>
+                <strong>KES {{ pricing.subtotal|floatformat:0|intcomma }}</strong>
+            </div>
+            <div class="pricing-row">
+                <span>Extra Services</span>
+                <strong>KES {{ pricing.extras_total|floatformat:0|intcomma }}</strong>
+            </div>
+            <div class="pricing-row">
                 <span>Taxes & Fees</span>
                 <strong>KES {{ pricing.taxes|floatformat:0|intcomma }}</strong>
             </div>
@@ -106,23 +113,49 @@
                 <span>Total Amount</span>
                 <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
             </div>
+            <button class="primary-button full-width" type="submit">Proceed to Payment</button>
         </div>
-    </div>
+    </form>
 
     <aside class="booking-side">
         <div class="content-panel sticky-card">
-            <h2>Extras</h2>
+            <h2>Extra Services</h2>
+            <p>Select the add-ons you want included in the rental agreement and final payment.</p>
             <div class="extras-list">
-                {% for extra in extras %}
+                {% for extra in extra_services %}
                     <article class="extra-card">
-                        <div>
-                            <strong>{{ extra.name }}</strong>
-                            <p>{{ extra.description }}</p>
-                        </div>
-                        <span>KES {{ extra.price|floatformat:0|intcomma }} / day</span>
+                        <label class="extra-choice">
+                            <input
+                                type="checkbox"
+                                name="selected_extras"
+                                value="{{ extra.id }}"
+                                form="booking-form"
+                                {% if extra.id|stringformat:"s" in selected_extra_ids %}checked{% endif %}
+                            >
+                            <div>
+                                <strong>{{ extra.name }}</strong>
+                                <p>{{ extra.description }}</p>
+                            </div>
+                        </label>
+                        <span>
+                            KES {{ extra.price|floatformat:0|intcomma }}
+                            {% if extra.pricing_mode == 'daily' %}/ day{% else %}one-time{% endif %}
+                        </span>
                     </article>
                 {% endfor %}
             </div>
+
+            {% if pricing.selected_extras %}
+                <div class="selected-extras-summary">
+                    <h3>Selected Extras</h3>
+                    {% for extra in pricing.selected_extras %}
+                        <div class="pricing-row">
+                            <span>{{ extra.name }}</span>
+                            <strong>KES {{ extra.total|floatformat:0|intcomma }}</strong>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
             <h2>Your Benefits</h2>
             <div class="benefit-stack">

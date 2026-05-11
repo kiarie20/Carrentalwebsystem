@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Customer, Vehicle, Document, Booking, Payment, DeliveryAgreement
+from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, Vehicle
 
 
 @admin.register(Customer)
@@ -65,6 +65,19 @@ class BookingAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'start_date')
     search_fields = ('customer__user__username', 'vehicle__name')
+
+
+@admin.register(ExtraService)
+class ExtraServiceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'pricing_mode', 'price', 'is_active', 'display_order')
+    list_filter = ('pricing_mode', 'is_active')
+    search_fields = ('name', 'description', 'code')
+
+
+@admin.register(BookingExtra)
+class BookingExtraAdmin(admin.ModelAdmin):
+    list_display = ('booking', 'service', 'pricing_mode', 'unit_price', 'total_amount')
+    list_filter = ('pricing_mode',)
 
 
 @admin.register(Payment)

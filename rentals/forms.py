@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Customer, Document
+from .models import Customer, Document, ExtraService
 
 
 class BookingForm(forms.Form):
@@ -16,13 +16,31 @@ class BookingForm(forms.Form):
         widget=forms.DateInput(attrs={'type': 'date'})
     )
     delivery_location = forms.CharField(max_length=255, required=False)
+    selected_extras = forms.ModelMultipleChoiceField(
+        queryset=ExtraService.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, **kwargs):
+        extra_queryset = kwargs.pop('extra_queryset', ExtraService.objects.none())
+        super().__init__(*args, **kwargs)
+        self.fields['selected_extras'].queryset = extra_queryset
 
     def clean(self):
         cleaned_data = super().clean()
         start_date = cleaned_data.get('start_date')
         end_date = cleaned_data.get('end_date')
+        delivery_location = (cleaned_data.get('delivery_location') or '').strip()
+        selected_extras = cleaned_data.get('selected_extras')
         if start_date and end_date and end_date < start_date:
             raise forms.ValidationError('Drop-off date cannot be earlier than pick-up date.')
+        selected_codes = set(selected_extras.values_list('code', flat=True)) if selected_extras else set()
+        delivery_codes = {'nairobi_delivery', 'airport_delivery'}
+        if delivery_location and not selected_codes.intersection(delivery_codes):
+            raise forms.ValidationError('Select a delivery service if you want the vehicle delivered to your location.')
+        if selected_codes.intersection(delivery_codes) and not delivery_location:
+            raise forms.ValidationError('Provide the delivery location for the selected delivery service.')
         return cleaned_data
 
 

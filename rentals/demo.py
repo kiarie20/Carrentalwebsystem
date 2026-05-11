@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from .models import Vehicle
+from .models import ExtraService, Vehicle
 
 
 SAMPLE_VEHICLES = [
@@ -147,6 +147,49 @@ SAMPLE_VEHICLES = [
     },
 ]
 
+SAMPLE_EXTRA_SERVICES = [
+    {
+        'code': 'nairobi_delivery',
+        'name': 'Nairobi Vehicle Delivery',
+        'description': 'Vehicle delivery to your hotel, office, or residence within Nairobi County, matching the document delivery workflow.',
+        'price': Decimal('2500.00'),
+        'pricing_mode': 'flat',
+        'display_order': 1,
+    },
+    {
+        'code': 'airport_delivery',
+        'name': 'Airport Pick-up / Drop-off',
+        'description': 'Delivery and handover at JKIA or Wilson Airport for travelers who need direct airport collection.',
+        'price': Decimal('3500.00'),
+        'pricing_mode': 'flat',
+        'display_order': 2,
+    },
+    {
+        'code': 'additional_driver',
+        'name': 'Additional Driver Verification',
+        'description': 'Verification and onboarding of a second eligible driver, aligned with the document approval requirements in your project.',
+        'price': Decimal('1500.00'),
+        'pricing_mode': 'flat',
+        'display_order': 3,
+    },
+    {
+        'code': 'child_seat',
+        'name': 'Child Seat',
+        'description': 'A child safety seat for family travel, charged per rental day.',
+        'price': Decimal('700.00'),
+        'pricing_mode': 'daily',
+        'display_order': 4,
+    },
+    {
+        'code': 'comprehensive_insurance',
+        'name': 'Comprehensive Insurance Cover',
+        'description': 'Extra accident and damage cover added to the rental agreement, charged per day.',
+        'price': Decimal('1200.00'),
+        'pricing_mode': 'daily',
+        'display_order': 5,
+    },
+]
+
 
 def ensure_demo_vehicles():
     today = timezone.localdate()
@@ -161,4 +204,12 @@ def ensure_demo_vehicles():
         Vehicle.objects.update_or_create(
             plate_number=payload['plate_number'],
             defaults=payload,
+        )
+
+
+def ensure_default_extra_services():
+    for extra_data in SAMPLE_EXTRA_SERVICES:
+        ExtraService.objects.update_or_create(
+            code=extra_data['code'],
+            defaults=extra_data,
         )

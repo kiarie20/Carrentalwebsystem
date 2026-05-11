@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Booking, Customer, Document, Payment, Vehicle
+from .models import Booking, BookingExtra, Customer, Document, ExtraService, Payment, Vehicle
 
 
 class PublicPageTests(TestCase):
@@ -55,6 +55,14 @@ class BookingWorkflowTests(TestCase):
 
     def test_booking_creates_payment_and_updates_vehicle(self):
         self.client.login(username='customer1@example.com', password='pass12345')
+        delivery_extra = ExtraService.objects.create(
+            code='nairobi_delivery',
+            name='Nairobi Vehicle Delivery',
+            description='Delivery in Nairobi.',
+            price=Decimal('2500.00'),
+            pricing_mode='flat',
+            display_order=1,
+        )
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
@@ -63,19 +71,22 @@ class BookingWorkflowTests(TestCase):
                 'start_date': '2026-05-10',
                 'end_date': '2026-05-12',
                 'delivery_location': 'Westlands',
+                'selected_extras': [str(delivery_extra.id)],
             },
         )
 
         self.assertEqual(response.status_code, 200)
         booking = Booking.objects.get()
         payment = Payment.objects.get(booking=booking)
+        booking_extra = BookingExtra.objects.get(booking=booking, service=delivery_extra)
         self.vehicle.refresh_from_db()
 
-        self.assertEqual(booking.total_amount, Decimal('7500.00'))
+        self.assertEqual(booking.total_amount, Decimal('11000.00'))
         self.assertEqual(booking.status, 'Pending')
         self.assertEqual(booking.pickup_location, 'Nairobi, Kenya')
-        self.assertEqual(payment.amount, Decimal('7500.00'))
+        self.assertEqual(payment.amount, Decimal('11000.00'))
         self.assertEqual(payment.status, 'Pending')
+        self.assertEqual(booking_extra.total_amount, Decimal('2500.00'))
         self.assertEqual(self.vehicle.status, 'Booked')
         self.assertEqual(self.vehicle.next_available_date, date(2026, 5, 12))
         self.assertTrue(hasattr(booking, 'deliveryagreement'))
@@ -122,6 +133,23 @@ class BookingWorkflowTests(TestCase):
         )
 
         self.assertContains(response, 'documents must be approved')
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_booking_requires_delivery_service_for_delivery_location(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+
+        response = self.client.post(
+            reverse('book_vehicle', args=[self.vehicle.id]),
+            {
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
+                'start_date': '2026-05-10',
+                'end_date': '2026-05-12',
+                'delivery_location': 'Westlands',
+            },
+        )
+
+        self.assertContains(response, 'Select a delivery service')
         self.assertEqual(Booking.objects.count(), 0)
 
     def test_booking_redirects_anonymous_users_to_auth(self):

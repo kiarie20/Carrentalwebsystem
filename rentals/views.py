@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .demo import ensure_demo_vehicles
+from .demo import ensure_default_extra_services, ensure_demo_vehicles
 from .forms import (
     BookingForm,
     CustomerAccountApiForm,
@@ -21,15 +21,7 @@ from .forms import (
     CustomerRegistrationForm,
     DocumentUploadForm,
 )
-from .models import Booking, Customer, DeliveryAgreement, Document, Payment, Vehicle
-
-
-BOOKING_EXTRAS = [
-    {'name': 'Child Seat', 'price': Decimal('5.00'), 'description': 'For safe travel with kids.'},
-    {'name': 'GPS Navigation', 'price': Decimal('7.00'), 'description': 'Easy navigation on the go.'},
-    {'name': 'Wi-Fi Hotspot', 'price': Decimal('6.00'), 'description': 'Stay connected anywhere.'},
-    {'name': 'Additional Insurance', 'price': Decimal('10.00'), 'description': 'Extra protection for peace of mind.'},
-]
+from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, Vehicle
 
 BENEFITS = [
     {'title': 'Wide Range of Cars', 'copy': 'Choose from economy to luxury vehicles.'},
@@ -79,17 +71,37 @@ def build_vehicle_specs(vehicle):
     ]
 
 
-def build_pricing(vehicle, start_date=None, end_date=None):
+def build_pricing(vehicle, start_date=None, end_date=None, selected_extras=None):
+    selected_extras = list(selected_extras or [])
     if start_date and end_date and end_date >= start_date:
         total_days = (end_date - start_date).days + 1
     else:
         total_days = 3
     subtotal = vehicle.price_per_day * total_days
-    taxes = (subtotal * Decimal('0.10')).quantize(Decimal('0.01'))
-    total = subtotal + taxes
+    extras_breakdown = []
+    extras_total = Decimal('0.00')
+    for extra in selected_extras:
+        extra_total = extra.calculate_total(total_days)
+        extras_total += extra_total
+        extras_breakdown.append(
+            {
+                'id': extra.id,
+                'name': extra.name,
+                'code': extra.code,
+                'unit_price': extra.price,
+                'pricing_mode': extra.pricing_mode,
+                'pricing_label': 'per day' if extra.pricing_mode == 'daily' else 'one-time',
+                'total': extra_total,
+            }
+        )
+    taxable_amount = subtotal + extras_total
+    taxes = (taxable_amount * Decimal('0.10')).quantize(Decimal('0.01'))
+    total = taxable_amount + taxes
     return {
         'total_days': total_days,
         'subtotal': subtotal,
+        'selected_extras': extras_breakdown,
+        'extras_total': extras_total,
         'taxes': taxes,
         'total': total,
     }
@@ -281,7 +293,9 @@ def account_dashboard(request):
 
 
 def book_vehicle(request, vehicle_id):
+    ensure_default_extra_services()
     vehicle = get_object_or_404(Vehicle, id=vehicle_id)
+    available_extras = ExtraService.objects.filter(is_active=True)
     today = timezone.localdate()
     default_end = today + timedelta(days=2)
     initial = {
@@ -291,14 +305,15 @@ def book_vehicle(request, vehicle_id):
         'end_date': default_end,
         'delivery_location': vehicle.pickup_location,
     }
-    form = BookingForm(initial=initial)
+    form = BookingForm(initial=initial, extra_queryset=available_extras)
     context = {
         'active_page': 'cars',
         'vehicle': vehicle,
         'form': form,
         'pricing': build_pricing(vehicle),
         'benefits': BENEFITS,
-        'extras': BOOKING_EXTRAS,
+        'extra_services': available_extras,
+        'selected_extra_ids': [],
     }
 
     if request.method == 'POST':
@@ -306,7 +321,7 @@ def book_vehicle(request, vehicle_id):
             next_url = reverse('book_vehicle', args=[vehicle.id])
             return redirect(f"{reverse('auth_page')}?next={next_url}")
 
-        form = BookingForm(request.POST)
+        form = BookingForm(request.POST, extra_queryset=available_extras)
         context['form'] = form
 
         customer = get_customer_for_user(request.user)
@@ -318,14 +333,16 @@ def book_vehicle(request, vehicle_id):
         elif form.is_valid():
             start_date = form.cleaned_data['start_date']
             end_date = form.cleaned_data['end_date']
-            context['pricing'] = build_pricing(vehicle, start_date, end_date)
+            selected_extras = list(form.cleaned_data['selected_extras'])
+            context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
+            context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
 
             if vehicle.status == 'Maintenance':
                 context['error'] = 'This vehicle is currently under maintenance.'
             elif Booking.has_conflict(vehicle, start_date, end_date):
                 context['error'] = 'This vehicle is already booked for the selected dates.'
             else:
-                total_amount = Booking.calculate_total(vehicle, start_date, end_date)
+                total_amount = context['pricing']['total']
                 with transaction.atomic():
                     booking = Booking.objects.create(
                         customer=customer,
@@ -337,6 +354,14 @@ def book_vehicle(request, vehicle_id):
                         total_amount=total_amount,
                         status='Pending',
                     )
+                    for extra in selected_extras:
+                        BookingExtra.objects.create(
+                            booking=booking,
+                            service=extra,
+                            unit_price=extra.price,
+                            pricing_mode=extra.pricing_mode,
+                            total_amount=extra.calculate_total(context['pricing']['total_days']),
+                        )
                     Payment.objects.create(
                         booking=booking,
                         amount=total_amount,
@@ -352,15 +377,17 @@ def book_vehicle(request, vehicle_id):
 
                 context['success'] = 'Booking created successfully. Payment is pending confirmation.'
                 context['booking'] = booking
-                context['pricing'] = build_pricing(vehicle, start_date, end_date)
+                context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
         else:
             start_date = form.data.get('start_date')
             end_date = form.data.get('end_date')
+            selected_extras = list(available_extras.filter(id__in=request.POST.getlist('selected_extras')))
+            context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
             if start_date and end_date:
                 try:
                     parsed_start = date.fromisoformat(start_date)
                     parsed_end = date.fromisoformat(end_date)
-                    context['pricing'] = build_pricing(vehicle, parsed_start, parsed_end)
+                    context['pricing'] = build_pricing(vehicle, parsed_start, parsed_end, selected_extras)
                 except ValueError:
                     pass
     elif request.user.is_authenticated:
@@ -519,6 +546,15 @@ def api_my_bookings(request):
             'cancelled_at': booking.cancelled_at.isoformat() if booking.cancelled_at else None,
             'cancel_reason': booking.cancel_reason,
             'can_cancel': booking.can_cancel(),
+            'extras': [
+                {
+                    'name': item.service.name,
+                    'pricing_mode': item.pricing_mode,
+                    'unit_price': str(item.unit_price),
+                    'total_amount': str(item.total_amount),
+                }
+                for item in booking.booking_extras.select_related('service').all()
+            ],
         }
         for booking in bookings
     ]

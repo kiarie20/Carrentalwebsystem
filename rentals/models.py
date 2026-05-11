@@ -168,6 +168,46 @@ class Booking(models.Model):
         self.vehicle.refresh_availability()
 
 
+class ExtraService(models.Model):
+    PRICING_MODE_CHOICES = [
+        ('daily', 'Per Day'),
+        ('flat', 'One Time'),
+    ]
+
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    pricing_mode = models.CharField(max_length=10, choices=PRICING_MODE_CHOICES, default='daily')
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def calculate_total(self, rental_days):
+        if self.pricing_mode == 'daily':
+            return self.price * rental_days
+        return self.price
+
+
+class BookingExtra(models.Model):
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='booking_extras')
+    service = models.ForeignKey(ExtraService, on_delete=models.PROTECT)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    pricing_mode = models.CharField(max_length=10, choices=ExtraService.PRICING_MODE_CHOICES)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        unique_together = ('booking', 'service')
+
+    def __str__(self):
+        return f"{self.booking} - {self.service.name}"
+
+
 class Payment(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
