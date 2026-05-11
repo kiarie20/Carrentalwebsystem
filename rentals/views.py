@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -14,6 +15,7 @@ from django.utils import timezone
 from .demo import ensure_demo_vehicles
 from .forms import (
     BookingForm,
+    CustomerAccountApiForm,
     CustomerLoginForm,
     CustomerProfileForm,
     CustomerRegistrationForm,
@@ -35,6 +37,22 @@ BENEFITS = [
     {'title': 'Easy Booking', 'copy': 'Book your car online in just a few minutes.'},
     {'title': '24/7 Support', 'copy': 'Our support team is always ready to assist you.'},
 ]
+
+
+def get_customer_for_user(user):
+    return Customer.objects.get_or_create(
+        user=user,
+        defaults={'phone': '', 'national_id_number': '', 'address': 'Nairobi, Kenya'},
+    )[0]
+
+
+def get_request_payload(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return None
+    return request.POST
 
 
 def build_vehicle_features(vehicle):
@@ -189,11 +207,10 @@ def auth_page(request):
             login_form = CustomerLoginForm(request=request)
             if register_form.is_valid():
                 user = register_form.save()
-                Customer.objects.create(
-                    user=user,
-                    phone=register_form.cleaned_data['phone'],
-                    address='Nairobi, Kenya',
-                )
+                customer = get_customer_for_user(user)
+                customer.phone = register_form.cleaned_data['phone']
+                customer.address = customer.address or 'Nairobi, Kenya'
+                customer.save(update_fields=['phone', 'address'])
                 login(request, user)
                 if next_url == reverse('home'):
                     return redirect('account_dashboard')
@@ -217,10 +234,7 @@ def logout_user(request):
 
 @login_required(login_url='auth_page')
 def account_dashboard(request):
-    customer, _ = Customer.objects.get_or_create(
-        user=request.user,
-        defaults={'phone': '', 'national_id_number': '', 'address': 'Nairobi, Kenya'},
-    )
+    customer = get_customer_for_user(request.user)
     document = Document.objects.filter(customer=customer).first()
 
     if request.method == 'POST':
@@ -242,6 +256,9 @@ def account_dashboard(request):
                 uploaded_document = document_form.save(commit=False)
                 uploaded_document.customer = customer
                 uploaded_document.verification_status = 'Pending'
+                uploaded_document.reviewed_at = None
+                uploaded_document.reviewed_by = None
+                uploaded_document.review_notes = ''
                 uploaded_document.save()
                 return redirect('account_dashboard')
         else:
@@ -292,10 +309,7 @@ def book_vehicle(request, vehicle_id):
         form = BookingForm(request.POST)
         context['form'] = form
 
-        customer, _ = Customer.objects.get_or_create(
-            user=request.user,
-            defaults={'phone': '', 'national_id_number': '', 'address': 'Nairobi, Kenya'},
-        )
+        customer = get_customer_for_user(request.user)
         document = Document.objects.filter(customer=customer).first()
         context['document_status'] = document.verification_status if document else 'Missing'
 
@@ -418,13 +432,77 @@ def api_vehicle_detail(request, vehicle_id):
 
 
 @login_required(login_url='auth_page')
+def api_my_profile(request):
+    customer = get_customer_for_user(request.user)
+
+    if request.method == 'GET':
+        return JsonResponse(
+            {
+                'username': request.user.username,
+                'email': request.user.email,
+                'full_name': request.user.first_name,
+                'phone': customer.phone,
+                'national_id_number': customer.national_id_number,
+                'address': customer.address,
+            }
+        )
+
+    if request.method == 'POST':
+        payload = get_request_payload(request)
+        if payload is None:
+            return JsonResponse({'detail': 'Invalid JSON payload.'}, status=400)
+
+        form = CustomerAccountApiForm(payload, instance=customer, user=request.user)
+        if form.is_valid():
+            updated_customer = form.save()
+            return JsonResponse(
+                {
+                    'detail': 'Profile updated successfully.',
+                    'profile': {
+                        'username': updated_customer.user.username,
+                        'email': updated_customer.user.email,
+                        'full_name': updated_customer.user.first_name,
+                        'phone': updated_customer.phone,
+                        'national_id_number': updated_customer.national_id_number,
+                        'address': updated_customer.address,
+                    },
+                }
+            )
+        return JsonResponse({'errors': form.errors.get_json_data()}, status=400)
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@login_required(login_url='auth_page')
+def api_my_documents(request):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    customer = get_customer_for_user(request.user)
+    document = Document.objects.filter(customer=customer).first()
+    if not document:
+        return JsonResponse({'exists': False, 'status': 'Missing'})
+
+    return JsonResponse(
+        {
+            'exists': True,
+            'status': document.verification_status,
+            'uploaded_at': document.uploaded_at.isoformat() if document.uploaded_at else None,
+            'reviewed_at': document.reviewed_at.isoformat() if document.reviewed_at else None,
+            'reviewed_by': document.reviewed_by.username if document.reviewed_by else None,
+            'review_notes': document.review_notes,
+            'national_id_file': document.national_id_file.url if document.national_id_file else None,
+            'driver_license_file': document.driver_license_file.url if document.driver_license_file else None,
+        }
+    )
+
+
+@login_required(login_url='auth_page')
 def api_my_bookings(request):
     if request.method != 'GET':
         return JsonResponse({'detail': 'Method not allowed.'}, status=405)
 
-    customer = Customer.objects.filter(user=request.user).first()
-    if not customer:
-        return JsonResponse({'count': 0, 'results': []})
+    customer = get_customer_for_user(request.user)
 
     bookings = Booking.objects.filter(customer=customer).select_related('vehicle').order_by('-created_at')
     data = [
@@ -438,7 +516,43 @@ def api_my_bookings(request):
             'total_amount': str(booking.total_amount),
             'status': booking.status,
             'created_at': booking.created_at.isoformat(),
+            'cancelled_at': booking.cancelled_at.isoformat() if booking.cancelled_at else None,
+            'cancel_reason': booking.cancel_reason,
+            'can_cancel': booking.can_cancel(),
         }
         for booking in bookings
     ]
     return JsonResponse({'count': len(data), 'results': data})
+
+
+@login_required(login_url='auth_page')
+def api_cancel_booking(request, booking_id):
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    customer = get_customer_for_user(request.user)
+    booking = get_object_or_404(
+        Booking.objects.select_related('vehicle'),
+        id=booking_id,
+        customer=customer,
+    )
+    payload = get_request_payload(request)
+    if payload is None:
+        return JsonResponse({'detail': 'Invalid JSON payload.'}, status=400)
+
+    if not booking.can_cancel():
+        return JsonResponse({'detail': 'This booking can no longer be cancelled.'}, status=400)
+
+    reason = payload.get('reason', '') if hasattr(payload, 'get') else ''
+    booking.cancel(reason=reason)
+    return JsonResponse(
+        {
+            'detail': 'Booking cancelled successfully.',
+            'booking': {
+                'id': booking.id,
+                'status': booking.status,
+                'cancelled_at': booking.cancelled_at.isoformat() if booking.cancelled_at else None,
+                'cancel_reason': booking.cancel_reason,
+            },
+        }
+    )

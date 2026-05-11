@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import Customer, Vehicle, Document, Booking, Payment, DeliveryAgreement
 
 
@@ -26,17 +27,26 @@ class VehicleAdmin(admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('customer', 'verification_status', 'uploaded_at')
+    list_display = ('customer', 'verification_status', 'uploaded_at', 'reviewed_at', 'reviewed_by')
     list_filter = ('verification_status',)
+    search_fields = ('customer__user__username', 'review_notes')
     actions = ('approve_documents', 'reject_documents')
 
     @admin.action(description='Approve selected documents')
     def approve_documents(self, request, queryset):
-        queryset.update(verification_status='Approved')
+        queryset.update(
+            verification_status='Approved',
+            reviewed_at=timezone.now(),
+            reviewed_by=request.user,
+        )
 
     @admin.action(description='Reject selected documents')
     def reject_documents(self, request, queryset):
-        queryset.update(verification_status='Rejected')
+        queryset.update(
+            verification_status='Rejected',
+            reviewed_at=timezone.now(),
+            reviewed_by=request.user,
+        )
 
 
 @admin.register(Booking)
@@ -50,6 +60,7 @@ class BookingAdmin(admin.ModelAdmin):
         'end_date',
         'total_amount',
         'status',
+        'cancelled_at',
         'created_at',
     )
     list_filter = ('status', 'start_date')

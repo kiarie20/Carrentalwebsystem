@@ -86,9 +86,25 @@ class Document(models.Model):
     driver_license_file = models.FileField(upload_to='documents/driver_licenses/')
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='reviewed_documents',
+    )
+    review_notes = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.customer.user.username} Documents"
+
+    def mark_reviewed(self, status, reviewed_by=None, notes=''):
+        self.verification_status = status
+        self.reviewed_at = timezone.now()
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.save(update_fields=['verification_status', 'reviewed_at', 'reviewed_by', 'review_notes'])
 
 
 class Booking(models.Model):
@@ -108,6 +124,8 @@ class Booking(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    cancelled_at = models.DateTimeField(blank=True, null=True)
+    cancel_reason = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
         return f"{self.customer.user.username} - {self.vehicle.name}"
@@ -128,6 +146,19 @@ class Booking(models.Model):
     def calculate_total(vehicle, start_date, end_date):
         rental_days = (end_date - start_date).days + 1
         return vehicle.price_per_day * rental_days
+
+    def can_cancel(self):
+        return self.status in ['Pending', 'Confirmed'] and self.start_date > timezone.localdate()
+
+    def cancel(self, reason=''):
+        if not self.can_cancel():
+            raise ValueError('This booking can no longer be cancelled.')
+
+        self.status = 'Cancelled'
+        self.cancelled_at = timezone.now()
+        self.cancel_reason = reason.strip()
+        self.save(update_fields=['status', 'cancelled_at', 'cancel_reason'])
+        self.vehicle.refresh_availability()
 
 
 class Payment(models.Model):
