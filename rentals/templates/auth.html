@@ -27,8 +27,20 @@
 
         <div class="auth-panels">
             <a class="back-link" href="{% url 'home' %}">Back to Home</a>
-            <div class="auth-card-grid">
-                <section class="content-panel">
+            <section class="content-panel auth-header-panel">
+                <span class="section-kicker">Account Access</span>
+                <h2>Login fast or create your account and continue straight into booking.</h2>
+                <p>Returning customers can sign in in a few seconds. New customers can register here, then move directly into booking and document verification.</p>
+                <div class="auth-flow-hints">
+                    <span>1. Login or Register</span>
+                    <span>2. Complete Booking</span>
+                    <span>3. Verify Documents</span>
+                </div>
+            </section>
+
+            <div class="auth-card-grid auth-flow-grid">
+                <section class="content-panel auth-card auth-login-card" id="login">
+                    <span class="section-kicker">Returning Customer</span>
                     <h2>Login</h2>
                     <p>Welcome back. Sign in to continue booking and managing your trips.</p>
                     <form method="post" class="stack-form">
@@ -48,9 +60,11 @@
                         {% endif %}
                         <button class="primary-button full-width" type="submit">Login</button>
                     </form>
+                    <p class="auth-card-footer">New here? Create your account in the next section.</p>
                 </section>
 
-                <section class="content-panel">
+                <section class="content-panel auth-card auth-register-card" id="register">
+                    <span class="section-kicker">New Customer</span>
                     <h2>Create Account</h2>
                     <p>Fill in your details to start browsing, booking, and managing your rentals.</p>
                     <form method="post" class="stack-form">
@@ -91,6 +105,7 @@
                         {% endif %}
                         <button class="primary-button full-width" type="submit">Register</button>
                     </form>
+                    <p class="auth-card-footer">Already registered? Use the login form to the left.</p>
                 </section>
             </div>
         </div>

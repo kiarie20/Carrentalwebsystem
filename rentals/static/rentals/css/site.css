@@ -989,6 +989,10 @@ main {
     color: #fff;
 }
 
+.auth-visual .benefit-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .alert-card {
     margin-bottom: 18px;
 }
@@ -1092,6 +1096,76 @@ main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.auth-flow-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+}
+
+.auth-header-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #faf8f3 100%);
+}
+
+.auth-header-panel h2 {
+    margin: 10px 0 10px;
+    font-size: clamp(1.7rem, 2.5vw, 2.35rem);
+    line-height: 1.18;
+}
+
+.section-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.auth-flow-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.auth-flow-hints span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 166, 74, 0.18);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text);
+    font-weight: 600;
+}
+
+.auth-card {
+    height: 100%;
+}
+
+.auth-card h2 {
+    margin: 12px 0 8px;
+}
+
+.auth-card-footer {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.96rem;
+}
+
+.auth-login-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+}
+
+.auth-register-card {
+    background: linear-gradient(180deg, #ffffff 0%, #faf8f2 100%);
+}
+
 .stack-form {
     display: grid;
     gap: 16px;
@@ -1178,6 +1252,20 @@ main {
 
     .search-submit {
         grid-column: span 2;
+    }
+
+    .auth-panels {
+        order: 1;
+    }
+
+    .auth-visual {
+        order: 2;
+        min-height: 640px;
+    }
+
+    .auth-flow-grid,
+    .auth-visual .benefit-stack {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1283,6 +1371,14 @@ main {
     }
 
     .auth-visual {
-        min-height: 860px;
+        min-height: 520px;
+    }
+
+    .auth-overlay {
+        gap: 16px;
+    }
+
+    .auth-header-panel h2 {
+        font-size: 1.55rem;
     }
 }
