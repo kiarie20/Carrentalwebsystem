@@ -18,6 +18,13 @@ class PublicPageTests(TestCase):
         self.assertGreater(Vehicle.objects.count(), 0)
         self.assertContains(response, 'Featured Fleet')
 
+    def test_admin_login_page_shows_staff_only_message(self):
+        response = self.client.get(f"{reverse('admin:login')}?next={reverse('admin_dashboard')}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Admin and worker access only.')
+        self.assertContains(response, 'Customer? Use the normal login page instead.')
+
 
 class BookingWorkflowTests(TestCase):
     def setUp(self):
@@ -172,6 +179,13 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('auth_page'), response.url)
 
+    def test_logged_in_customer_visiting_auth_page_is_redirected_to_account(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+
+        response = self.client.get(reverse('auth_page'))
+
+        self.assertRedirects(response, reverse('account_dashboard'))
+
     def test_booking_page_document_upload_resets_status_to_pending(self):
         self.client.login(username='customer1@example.com', password='pass12345')
         Document.objects.filter(customer=self.customer).update(verification_status='Approved')
@@ -319,3 +333,65 @@ class ApiTests(TestCase):
         self.assertEqual(booking.cancel_reason, 'Change of travel plans')
         self.assertIsNotNone(booking.cancelled_at)
         self.assertEqual(self.vehicle.status, 'Available')
+
+
+class AdminDashboardTests(TestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='admin@example.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        self.customer_user = User.objects.create_user(username='client@example.com', password='pass12345')
+        self.customer = Customer.objects.get(user=self.customer_user)
+        self.customer.phone = '0700111222'
+        self.customer.address = 'Nairobi'
+        self.customer.save()
+        self.vehicle = Vehicle.objects.create(
+            name='BMW X5',
+            model='XDrive',
+            plate_number='KDG 909Z',
+            vehicle_type='SUV',
+            transmission='Automatic',
+            fuel_type='Diesel',
+            price_per_day=Decimal('15000.00'),
+            status='Available',
+        )
+        self.booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi',
+            dropoff_location='Nairobi',
+            start_date=timezone.localdate() + timedelta(days=1),
+            end_date=timezone.localdate() + timedelta(days=3),
+            total_amount=Decimal('45000.00'),
+            status='Confirmed',
+        )
+        Payment.objects.create(
+            booking=self.booking,
+            amount=Decimal('45000.00'),
+            status='Pending',
+        )
+
+    def test_admin_dashboard_requires_staff_login(self):
+        response = self.client.get(reverse('admin_dashboard'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('admin:login'), response.url)
+
+    def test_admin_dashboard_renders_for_staff(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.get(reverse('admin_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dashboard')
+        self.assertContains(response, 'Recent Bookings')
+        self.assertContains(response, 'BMW X5')
+
+    def test_logged_in_staff_visiting_auth_page_is_redirected_to_admin_dashboard(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.get(reverse('auth_page'))
+
+        self.assertRedirects(response, reverse('admin_dashboard'))

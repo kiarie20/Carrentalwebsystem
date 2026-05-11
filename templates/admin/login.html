@@ -1,0 +1,80 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% translate "Staff Login" %} | RIRI Car Rentals</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_login.css' %}">
+</head>
+<body class="admin-role-login">
+    <main class="role-login-page">
+        <div class="role-login-shell">
+            <section class="role-login-intro">
+                <span class="role-login-kicker">Staff Sign In</span>
+                <h1>Admin and worker access only.</h1>
+                <p>This login is for staff users who manage bookings, customers, vehicles, documents, payments, and reporting.</p>
+                <div class="role-login-points">
+                    <span>Admin Dashboard</span>
+                    <span>Django Admin Tools</span>
+                    <span>Staff Permissions Required</span>
+                </div>
+                <a class="role-login-link" href="{% url 'auth_page' %}">Customer? Use the normal login page instead.</a>
+            </section>
+
+            <section class="role-login-panel">
+                <div class="role-login-panel-header">
+                    <span class="role-login-panel-kicker">RIRI Car Rentals</span>
+                    <h2>Staff Portal Login</h2>
+                    <p>Use your staff username and password to continue to the admin dashboard.</p>
+                </div>
+
+                {% if form.errors and not form.non_field_errors %}
+                    <p class="errornote">
+                        {% translate "Please correct the error below." %}
+                    </p>
+                {% endif %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <p class="errornote">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+
+                {% if user.is_authenticated %}
+                    <p class="errornote">
+                        {% blocktranslate trimmed %}
+                            You are authenticated as {{ username }}, but do not have permission to access this page.
+                            Would you like to sign in to a different account?
+                        {% endblocktranslate %}
+                    </p>
+                {% endif %}
+
+                <form action="{{ app_path }}" method="post" id="login-form">
+                    {% csrf_token %}
+                    <div class="form-row">
+                        {{ form.username.errors }}
+                        <label for="{{ form.username.id_for_label }}">{% translate "Username" %}</label>
+                        {{ form.username }}
+                    </div>
+                    <div class="form-row">
+                        {{ form.password.errors }}
+                        <label for="{{ form.password.id_for_label }}">{% translate "Password" %}</label>
+                        {{ form.password }}
+                        <input type="hidden" name="next" value="{{ next }}">
+                    </div>
+                    {% url 'admin_password_reset' as password_reset_url %}
+                    {% if password_reset_url %}
+                        <div class="password-reset-link">
+                            <a href="{{ password_reset_url }}">{% translate 'Forgotten your password or username?' %}</a>
+                        </div>
+                    {% endif %}
+                    <div class="submit-row">
+                        <input type="submit" value="{% translate 'Log in as staff' %}">
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

@@ -2,11 +2,12 @@ import json
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -29,6 +30,12 @@ BENEFITS = [
     {'title': 'Easy Booking', 'copy': 'Book your car online in just a few minutes.'},
     {'title': '24/7 Support', 'copy': 'Our support team is always ready to assist you.'},
 ]
+
+
+def get_default_dashboard_url(user):
+    if user.is_staff:
+        return reverse('admin_dashboard')
+    return reverse('account_dashboard')
 
 
 def get_customer_for_user(user):
@@ -105,6 +112,44 @@ def build_pricing(vehicle, start_date=None, end_date=None, selected_extras=None)
         'taxes': taxes,
         'total': total,
     }
+
+
+def format_currency(amount):
+    amount = amount or Decimal('0.00')
+    return f"KES {amount:,.0f}"
+
+
+def build_chart_points(values, width=640, height=250, padding=28):
+    if not values:
+        return ''
+
+    max_value = max(max(values), 1)
+    usable_width = width - (padding * 2)
+    usable_height = height - (padding * 2)
+    step_count = max(len(values) - 1, 1)
+    step_x = usable_width / step_count
+
+    points = []
+    for index, value in enumerate(values):
+        x = padding + (step_x * index)
+        y = height - padding - ((value / max_value) * usable_height)
+        points.append(f'{x:.1f},{y:.1f}')
+    return ' '.join(points)
+
+
+def build_status_gradient(status_rows):
+    if not status_rows:
+        return 'conic-gradient(#d6ddea 0 100%)'
+
+    gradient_parts = []
+    running_total = 0
+    for row in status_rows:
+        start = running_total
+        running_total += row['percentage']
+        gradient_parts.append(f"{row['color']} {start:.2f}% {running_total:.2f}%")
+    if running_total < 100:
+        gradient_parts.append(f"#d6ddea {running_total:.2f}% 100%")
+    return f"conic-gradient({', '.join(gradient_parts)})"
 
 
 def home(request):
@@ -200,7 +245,7 @@ def car_detail(request, vehicle_id):
 def auth_page(request):
     ensure_demo_vehicles()
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect(get_default_dashboard_url(request.user))
 
     next_url = request.GET.get('next') or request.POST.get('next') or reverse('home')
     login_form = CustomerLoginForm(request=request)
@@ -212,8 +257,13 @@ def auth_page(request):
             login_form = CustomerLoginForm(request.POST, request=request)
             register_form = CustomerRegistrationForm()
             if login_form.is_valid():
-                login(request, login_form.get_user())
-                return redirect(next_url)
+                user = login_form.get_user()
+                login(request, user)
+                if user.is_staff:
+                    return redirect(get_default_dashboard_url(user))
+                if next_url and next_url not in {reverse('home'), reverse('auth_page')}:
+                    return redirect(next_url)
+                return redirect(get_default_dashboard_url(user))
         elif action == 'register':
             register_form = CustomerRegistrationForm(request.POST)
             login_form = CustomerLoginForm(request=request)
@@ -224,9 +274,9 @@ def auth_page(request):
                 customer.address = customer.address or 'Nairobi, Kenya'
                 customer.save(update_fields=['phone', 'address'])
                 login(request, user)
-                if next_url == reverse('home'):
-                    return redirect('account_dashboard')
-                return redirect(next_url)
+                if next_url and next_url not in {reverse('home'), reverse('auth_page')}:
+                    return redirect(next_url)
+                return redirect(get_default_dashboard_url(user))
 
     context = {
         'active_page': 'auth',
@@ -242,6 +292,142 @@ def auth_page(request):
 def logout_user(request):
     logout(request)
     return redirect('home')
+
+
+@staff_member_required(login_url='admin:login')
+def admin_dashboard(request):
+    ensure_demo_vehicles()
+    ensure_default_extra_services()
+
+    today = timezone.localdate()
+    current_month_start = today.replace(day=1)
+    active_bookings = Booking.objects.exclude(status='Cancelled')
+    paid_revenue = Payment.objects.filter(status='Paid').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    revenue_total = active_bookings.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    pending_payments_total = Payment.objects.filter(status='Pending').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+    seven_day_labels = []
+    booking_series = []
+    completed_series = []
+    for offset in range(6, -1, -1):
+        current_day = today - timedelta(days=offset)
+        seven_day_labels.append(current_day.strftime('%d %b'))
+        booking_series.append(Booking.objects.filter(created_at__date=current_day).count())
+        completed_series.append(Booking.objects.filter(status='Completed', end_date=current_day).count())
+
+    status_palette = {
+        'Confirmed': '#2c66f0',
+        'Pending': '#f59e0b',
+        'Completed': '#10b981',
+        'Cancelled': '#ef4444',
+    }
+    total_bookings = Booking.objects.count()
+    status_rows = []
+    for label in ['Confirmed', 'Pending', 'Completed', 'Cancelled']:
+        count = Booking.objects.filter(status=label).count()
+        percentage = (count / total_bookings * 100) if total_bookings else 0
+        status_rows.append(
+            {
+                'label': label,
+                'count': count,
+                'percentage': percentage,
+                'color': status_palette[label],
+            }
+        )
+
+    recent_bookings = Booking.objects.select_related('customer__user', 'vehicle').order_by('-created_at')[:5]
+    top_vehicles = (
+        Vehicle.objects.annotate(
+            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+            total_revenue=Sum('booking__total_amount', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+        )
+        .order_by('-total_bookings', '-total_revenue', 'name')[:5]
+    )
+
+    summary_cards = [
+        {
+            'label': 'Total Cars',
+            'value': f"{Vehicle.objects.count():,}",
+            'note': f"{Vehicle.objects.filter(status='Available').count()} available now",
+            'tone': 'blue',
+            'glyph': 'C',
+        },
+        {
+            'label': 'Total Bookings',
+            'value': f"{total_bookings:,}",
+            'note': f"{Booking.objects.filter(status='Confirmed').count()} confirmed",
+            'tone': 'green',
+            'glyph': 'B',
+        },
+        {
+            'label': 'Total Customers',
+            'value': f"{Customer.objects.count():,}",
+            'note': f"{Document.objects.filter(verification_status='Approved').count()} verified",
+            'tone': 'violet',
+            'glyph': 'U',
+        },
+        {
+            'label': 'Total Revenue',
+            'value': format_currency(revenue_total),
+            'note': f"{format_currency(paid_revenue)} collected",
+            'tone': 'gold',
+            'glyph': 'K',
+        },
+        {
+            'label': 'Pending Payments',
+            'value': format_currency(pending_payments_total),
+            'note': f"{Payment.objects.filter(status='Pending').count()} awaiting confirmation",
+            'tone': 'rose',
+            'glyph': 'P',
+        },
+    ]
+
+    operational_cards = [
+        {
+            'label': 'New Customers (This Month)',
+            'value': f"{Customer.objects.filter(user__date_joined__date__gte=current_month_start).count():,}",
+            'note': 'Customer profiles created this month',
+            'tone': 'blue',
+            'glyph': 'N',
+        },
+        {
+            'label': 'Cars On Rent',
+            'value': f"{Vehicle.objects.filter(status__in=['Booked', 'Rented']).count():,}",
+            'note': 'Vehicles currently reserved or out',
+            'tone': 'green',
+            'glyph': 'R',
+        },
+        {
+            'label': 'Upcoming Bookings',
+            'value': f"{Booking.objects.filter(start_date__gte=today, status__in=['Pending', 'Confirmed']).count():,}",
+            'note': 'Future trips already scheduled',
+            'tone': 'gold',
+            'glyph': 'U',
+        },
+        {
+            'label': 'Extra Services',
+            'value': f"{ExtraService.objects.filter(is_active=True).count():,}",
+            'note': 'Active service add-ons available',
+            'tone': 'violet',
+            'glyph': 'S',
+        },
+    ]
+
+    context = {
+        'summary_cards': summary_cards,
+        'operational_cards': operational_cards,
+        'recent_bookings': recent_bookings,
+        'top_vehicles': top_vehicles,
+        'status_rows': status_rows,
+        'status_total': total_bookings,
+        'status_gradient': build_status_gradient(status_rows),
+        'chart_labels': seven_day_labels,
+        'booking_series_points': build_chart_points(booking_series),
+        'completed_series_points': build_chart_points(completed_series),
+        'chart_peak': max(booking_series + completed_series + [1]),
+        'today_label': today.strftime('%d %b %Y'),
+    }
+    return render(request, 'admin_dashboard.html', context)
 
 
 @login_required(login_url='auth_page')

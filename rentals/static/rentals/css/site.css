@@ -149,6 +149,29 @@ main {
     gap: 12px;
 }
 
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.role-customer {
+    background: rgba(44, 102, 240, 0.16);
+    color: #dbe8ff;
+}
+
+.role-staff {
+    background: rgba(212, 166, 74, 0.16);
+    color: #f6e5bb;
+}
+
 .nav-phone {
     font-weight: 600;
 }
@@ -1295,6 +1318,10 @@ main {
     .nav-actions {
         gap: 8px;
         flex-shrink: 0;
+    }
+
+    .role-badge {
+        display: none;
     }
 
     .nav-actions .ghost-button,

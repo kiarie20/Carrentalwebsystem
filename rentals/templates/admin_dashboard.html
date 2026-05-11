@@ -1,0 +1,239 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RIRI Admin Dashboard</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}">
+</head>
+<body class="admin-dashboard-body">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="dashboard-brand" href="{% url 'admin_dashboard' %}">
+                <span class="dashboard-brand-mark">R</span>
+                <span>
+                    <strong>RIRI</strong>
+                    <small>Admin Console</small>
+                </span>
+            </a>
+
+            <nav class="dashboard-nav">
+                <a class="is-active" href="{% url 'admin_dashboard' %}">Dashboard</a>
+                <a href="{% url 'admin:rentals_vehicle_changelist' %}">Cars</a>
+                <a href="{% url 'admin:rentals_booking_changelist' %}">Bookings</a>
+                <a href="{% url 'admin:rentals_customer_changelist' %}">Customers</a>
+                <a href="{% url 'admin:rentals_payment_changelist' %}">Payments</a>
+                <a href="{% url 'admin:rentals_document_changelist' %}">Documents</a>
+                <a href="{% url 'admin:rentals_extraservice_changelist' %}">Extra Services</a>
+                <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="admin-user-card">
+                    <span class="admin-avatar">{{ request.user.username|first|upper }}</span>
+                    <div>
+                        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                        <small>{{ request.user.email|default:"Admin User" }}</small>
+                    </div>
+                </div>
+                <div class="sidebar-actions">
+                    <a href="{% url 'admin:index' %}">Django Admin</a>
+                    <a href="{% url 'home' %}">Public Site</a>
+                    <a href="{% url 'logout_user' %}">Logout</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="topbar-kicker">RIRI Car Rentals</p>
+                    <h1>Dashboard</h1>
+                    <div class="dashboard-role-badge">Staff Access</div>
+                </div>
+                <div class="topbar-tools">
+                    <form class="topbar-search" action="{% url 'admin_dashboard' %}" method="get">
+                        <input type="text" name="q" placeholder="Search anything..." disabled>
+                    </form>
+                    <div class="topbar-date">{{ today_label }}</div>
+                </div>
+            </header>
+
+            <section class="metric-grid">
+                {% for card in summary_cards %}
+                    <article class="metric-card tone-{{ card.tone }}">
+                        <span class="metric-icon">{{ card.glyph }}</span>
+                        <div class="metric-copy">
+                            <p>{{ card.label }}</p>
+                            <h2>{{ card.value }}</h2>
+                            <small>{{ card.note }}</small>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+
+            <section class="dashboard-grid">
+                <article class="dashboard-panel chart-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Bookings Overview</h2>
+                            <p>Last 7 days of booking creation vs completed rentals.</p>
+                        </div>
+                        <span class="panel-tag">Last 7 Days</span>
+                    </div>
+
+                    <div class="chart-legend">
+                        <span><i class="legend-dot primary"></i>Bookings Created</span>
+                        <span><i class="legend-dot muted"></i>Completed</span>
+                    </div>
+
+                    <div class="line-chart-wrap">
+                        <svg class="line-chart" viewBox="0 0 640 250" role="img" aria-label="Bookings overview chart">
+                            <line x1="28" y1="28" x2="612" y2="28"></line>
+                            <line x1="28" y1="83" x2="612" y2="83"></line>
+                            <line x1="28" y1="138" x2="612" y2="138"></line>
+                            <line x1="28" y1="193" x2="612" y2="193"></line>
+                            <line x1="28" y1="222" x2="612" y2="222"></line>
+                            <polyline class="series-secondary" points="{{ completed_series_points }}"></polyline>
+                            <polyline class="series-primary" points="{{ booking_series_points }}"></polyline>
+                        </svg>
+                        <div class="chart-axis-labels">
+                            {% for label in chart_labels %}
+                                <span>{{ label }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </article>
+
+                <article class="dashboard-panel status-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Bookings Status</h2>
+                            <p>Live booking distribution across the system.</p>
+                        </div>
+                    </div>
+
+                    <div class="status-overview">
+                        <div class="status-donut" style="--status-gradient: {{ status_gradient }};">
+                            <div class="status-donut-center">
+                                <strong>{{ status_total|intcomma }}</strong>
+                                <span>Total</span>
+                            </div>
+                        </div>
+
+                        <div class="status-list">
+                            {% for row in status_rows %}
+                                <div class="status-list-item">
+                                    <span class="status-label">
+                                        <i class="status-swatch" style="background: {{ row.color }};"></i>
+                                        {{ row.label }}
+                                    </span>
+                                    <strong>{{ row.count|intcomma }} ({{ row.percentage|floatformat:1 }}%)</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="dashboard-grid lower-grid">
+                <article class="dashboard-panel recent-bookings-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Recent Bookings</h2>
+                            <p>The latest reservations and current statuses.</p>
+                        </div>
+                        <a class="panel-link" href="{% url 'admin:rentals_booking_changelist' %}">View All</a>
+                    </div>
+
+                    {% if recent_bookings %}
+                        <div class="table-wrap">
+                            <table class="dashboard-table">
+                                <thead>
+                                    <tr>
+                                        <th>Booking ID</th>
+                                        <th>Customer</th>
+                                        <th>Car</th>
+                                        <th>Pick-up</th>
+                                        <th>Return</th>
+                                        <th>Status</th>
+                                        <th>Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in recent_bookings %}
+                                        <tr>
+                                            <td>#BK{{ booking.id }}</td>
+                                            <td>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</td>
+                                            <td>{{ booking.vehicle.name }}</td>
+                                            <td>{{ booking.start_date|date:"d M, Y" }}</td>
+                                            <td>{{ booking.end_date|date:"d M, Y" }}</td>
+                                            <td>
+                                                <span class="booking-pill status-{{ booking.status|lower }}">{{ booking.status }}</span>
+                                            </td>
+                                            <td>KES {{ booking.total_amount|floatformat:0|intcomma }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state">
+                            <h3>No bookings yet</h3>
+                            <p>Once customers start reserving vehicles, their bookings will appear here.</p>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel ranking-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Top Vehicles</h2>
+                            <p>Vehicles bringing in the most activity right now.</p>
+                        </div>
+                        <a class="panel-link" href="{% url 'admin:rentals_vehicle_changelist' %}">View All</a>
+                    </div>
+
+                    <div class="ranking-list">
+                        {% for vehicle in top_vehicles %}
+                            <div class="ranking-item">
+                                <span class="ranking-position">{{ forloop.counter }}</span>
+                                {% if vehicle.primary_image_url %}
+                                    <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
+                                {% endif %}
+                                <div class="ranking-copy">
+                                    <strong>{{ vehicle.name }}</strong>
+                                    <small>{{ vehicle.total_bookings|default:0|intcomma }} bookings</small>
+                                </div>
+                                <div class="ranking-value">
+                                    <strong>{{ vehicle.total_revenue|default:0|floatformat:0|intcomma }}</strong>
+                                    <small>revenue</small>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No fleet data yet</h3>
+                                <p>Top vehicles will appear once bookings have been created.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="metric-grid bottom-metric-grid">
+                {% for card in operational_cards %}
+                    <article class="metric-card compact tone-{{ card.tone }}">
+                        <span class="metric-icon">{{ card.glyph }}</span>
+                        <div class="metric-copy">
+                            <p>{{ card.label }}</p>
+                            <h2>{{ card.value }}</h2>
+                            <small>{{ card.note }}</small>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>
