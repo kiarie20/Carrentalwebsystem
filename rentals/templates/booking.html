@@ -5,7 +5,7 @@
 
 {% block content %}
 <section class="page-section shell booking-layout">
-    <form method="post" class="booking-main" id="booking-form">
+    <form method="post" enctype="multipart/form-data" class="booking-main" id="booking-form">
         {% csrf_token %}
         <nav class="breadcrumbs">
             <a href="{% url 'home' %}">Home</a>
@@ -55,9 +55,35 @@
                 <div class="alert-card">
                     <strong>Document status:</strong>
                     <p>{{ document_status }}</p>
-                    {% if document_status != 'Approved' %}
-                        <a class="text-link" href="{% url 'account_dashboard' %}">Go to Dashboard to update documents</a>
-                    {% endif %}
+                </div>
+            {% endif %}
+
+            {% if request.user.is_authenticated and document_status != 'Approved' %}
+                <div class="content-panel">
+                    <div class="section-heading compact-heading">
+                        <h2>Document Verification</h2>
+                        <p>Upload your National ID and Driver's License here as part of the booking process.</p>
+                    </div>
+                    <div class="stack-form">
+                        <div class="field-group">
+                            <label for="{{ document_form.national_id_file.id_for_label }}">National ID File</label>
+                            {{ document_form.national_id_file }}
+                        </div>
+                        <div class="field-group">
+                            <label for="{{ document_form.driver_license_file.id_for_label }}">Driver License File</label>
+                            {{ document_form.driver_license_file }}
+                        </div>
+                        {% if document_form.errors %}
+                            <div class="form-errors">
+                                {% for field in document_form %}
+                                    {% for error in field.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <button class="primary-button" type="submit" name="action" value="documents">Upload Documents for Verification</button>
+                    </div>
                 </div>
             {% endif %}
 
@@ -113,7 +139,7 @@
                 <span>Total Amount</span>
                 <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
             </div>
-            <button class="primary-button full-width" type="submit">Proceed to Payment</button>
+            <button class="primary-button full-width" type="submit" name="action" value="booking">Proceed to Payment</button>
         </div>
     </form>
 

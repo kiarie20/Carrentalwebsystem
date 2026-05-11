@@ -7,7 +7,7 @@
 <section class="page-section shell account-layout">
     <div class="section-heading">
         <h1>My Account</h1>
-        <p>Manage your profile, upload verification documents, and review your recent bookings.</p>
+        <p>Manage your profile and review your recent bookings.</p>
     </div>
 
     <div class="account-grid">
@@ -54,28 +54,8 @@
                     </span>
                 </p>
             </div>
-            <form method="post" enctype="multipart/form-data" class="stack-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="documents">
-                <div class="field-group">
-                    <label for="{{ document_form.national_id_file.id_for_label }}">National ID File</label>
-                    {{ document_form.national_id_file }}
-                </div>
-                <div class="field-group">
-                    <label for="{{ document_form.driver_license_file.id_for_label }}">Driver License File</label>
-                    {{ document_form.driver_license_file }}
-                </div>
-                {% if document_form.errors %}
-                    <div class="form-errors">
-                        {% for field in document_form %}
-                            {% for error in field.errors %}
-                                <div>{{ error }}</div>
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                <button class="primary-button" type="submit">Upload Documents</button>
-            </form>
+            <p>Document upload now happens during the booking process so verification is handled at the point of reservation.</p>
+            <a class="primary-button" href="{% url 'car_list' %}">Start a Booking</a>
         </section>
     </div>
 

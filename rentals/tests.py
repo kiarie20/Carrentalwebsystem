@@ -132,7 +132,7 @@ class BookingWorkflowTests(TestCase):
             },
         )
 
-        self.assertContains(response, 'documents must be approved')
+        self.assertContains(response, 'Upload your documents here before confirming the booking.')
         self.assertEqual(Booking.objects.count(), 0)
 
     def test_booking_requires_delivery_service_for_delivery_location(self):
@@ -172,12 +172,12 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('auth_page'), response.url)
 
-    def test_document_upload_resets_status_to_pending(self):
+    def test_booking_page_document_upload_resets_status_to_pending(self):
         self.client.login(username='customer1@example.com', password='pass12345')
         Document.objects.filter(customer=self.customer).update(verification_status='Approved')
 
         response = self.client.post(
-            reverse('account_dashboard'),
+            reverse('book_vehicle', args=[self.vehicle.id]),
             {
                 'action': 'documents',
                 'national_id_file': SimpleUploadedFile('updated-id.pdf', b'new-id'),
@@ -185,9 +185,18 @@ class BookingWorkflowTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
         document = Document.objects.get(customer=self.customer)
         self.assertEqual(document.verification_status, 'Pending')
+
+    def test_booking_page_shows_document_upload_section_when_not_approved(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        Document.objects.filter(customer=self.customer).update(verification_status='Missing')
+
+        response = self.client.get(reverse('book_vehicle', args=[self.vehicle.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Upload Documents for Verification')
 
 
 class ApiTests(TestCase):

@@ -253,32 +253,13 @@ def account_dashboard(request):
         action = request.POST.get('action')
         if action == 'profile':
             profile_form = CustomerProfileForm(request.POST, instance=customer)
-            document_form = DocumentUploadForm(instance=document)
             if profile_form.is_valid():
                 profile_form.save()
                 return redirect('account_dashboard')
-        elif action == 'documents':
-            document_form = DocumentUploadForm(
-                request.POST,
-                request.FILES,
-                instance=document,
-            )
-            profile_form = CustomerProfileForm(instance=customer)
-            if document_form.is_valid():
-                uploaded_document = document_form.save(commit=False)
-                uploaded_document.customer = customer
-                uploaded_document.verification_status = 'Pending'
-                uploaded_document.reviewed_at = None
-                uploaded_document.reviewed_by = None
-                uploaded_document.review_notes = ''
-                uploaded_document.save()
-                return redirect('account_dashboard')
         else:
             profile_form = CustomerProfileForm(instance=customer)
-            document_form = DocumentUploadForm(instance=document)
     else:
         profile_form = CustomerProfileForm(instance=customer)
-        document_form = DocumentUploadForm(instance=document)
 
     bookings = Booking.objects.filter(customer=customer).select_related('vehicle').order_by('-created_at')
     context = {
@@ -286,7 +267,6 @@ def account_dashboard(request):
         'customer': customer,
         'document': document,
         'profile_form': profile_form,
-        'document_form': document_form,
         'bookings': bookings,
     }
     return render(request, 'account_dashboard.html', context)
@@ -314,6 +294,7 @@ def book_vehicle(request, vehicle_id):
         'benefits': BENEFITS,
         'extra_services': available_extras,
         'selected_extra_ids': [],
+        'document_form': None,
     }
 
     if request.method == 'POST':
@@ -321,80 +302,106 @@ def book_vehicle(request, vehicle_id):
             next_url = reverse('book_vehicle', args=[vehicle.id])
             return redirect(f"{reverse('auth_page')}?next={next_url}")
 
-        form = BookingForm(request.POST, extra_queryset=available_extras)
-        context['form'] = form
-
         customer = get_customer_for_user(request.user)
         document = Document.objects.filter(customer=customer).first()
         context['document_status'] = document.verification_status if document else 'Missing'
+        action = request.POST.get('action', 'booking')
 
-        if not document or document.verification_status != 'Approved':
-            context['error'] = 'Your documents must be approved before you can confirm a booking.'
-        elif form.is_valid():
-            start_date = form.cleaned_data['start_date']
-            end_date = form.cleaned_data['end_date']
-            selected_extras = list(form.cleaned_data['selected_extras'])
-            context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
-            context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
-
-            if vehicle.status == 'Maintenance':
-                context['error'] = 'This vehicle is currently under maintenance.'
-            elif Booking.has_conflict(vehicle, start_date, end_date):
-                context['error'] = 'This vehicle is already booked for the selected dates.'
+        if action == 'documents':
+            document_form = DocumentUploadForm(
+                request.POST,
+                request.FILES,
+                instance=document,
+            )
+            context['document_form'] = document_form
+            if document_form.is_valid():
+                uploaded_document = document_form.save(commit=False)
+                uploaded_document.customer = customer
+                uploaded_document.verification_status = 'Pending'
+                uploaded_document.reviewed_at = None
+                uploaded_document.reviewed_by = None
+                uploaded_document.review_notes = ''
+                uploaded_document.save()
+                context['document_status'] = uploaded_document.verification_status
+                context['success'] = 'Documents uploaded successfully. They are now awaiting admin verification.'
+                context['document_form'] = DocumentUploadForm(instance=uploaded_document)
             else:
-                total_amount = context['pricing']['total']
-                with transaction.atomic():
-                    booking = Booking.objects.create(
-                        customer=customer,
-                        vehicle=vehicle,
-                        pickup_location=form.cleaned_data['pickup_location'],
-                        dropoff_location=form.cleaned_data['dropoff_location'],
-                        start_date=start_date,
-                        end_date=end_date,
-                        total_amount=total_amount,
-                        status='Pending',
-                    )
-                    for extra in selected_extras:
-                        BookingExtra.objects.create(
-                            booking=booking,
-                            service=extra,
-                            unit_price=extra.price,
-                            pricing_mode=extra.pricing_mode,
-                            total_amount=extra.calculate_total(context['pricing']['total_days']),
-                        )
-                    Payment.objects.create(
-                        booking=booking,
-                        amount=total_amount,
-                        status='Pending',
-                    )
-                    if form.cleaned_data['delivery_location']:
-                        DeliveryAgreement.objects.create(
-                            booking=booking,
-                            delivery_location=form.cleaned_data['delivery_location'],
-                            delivery_date=start_date,
-                        )
-                    vehicle.refresh_availability()
-
-                context['success'] = 'Booking created successfully. Payment is pending confirmation.'
-                context['booking'] = booking
-                context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
+                context['error'] = 'Please correct the document upload errors below.'
         else:
-            start_date = form.data.get('start_date')
-            end_date = form.data.get('end_date')
-            selected_extras = list(available_extras.filter(id__in=request.POST.getlist('selected_extras')))
-            context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
-            if start_date and end_date:
-                try:
-                    parsed_start = date.fromisoformat(start_date)
-                    parsed_end = date.fromisoformat(end_date)
-                    context['pricing'] = build_pricing(vehicle, parsed_start, parsed_end, selected_extras)
-                except ValueError:
-                    pass
+            form = BookingForm(request.POST, extra_queryset=available_extras)
+            context['form'] = form
+            if not document or document.verification_status != 'Approved':
+                context['error'] = 'Upload your documents here before confirming the booking.'
+            elif form.is_valid():
+                start_date = form.cleaned_data['start_date']
+                end_date = form.cleaned_data['end_date']
+                selected_extras = list(form.cleaned_data['selected_extras'])
+                context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
+                context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
+
+                if vehicle.status == 'Maintenance':
+                    context['error'] = 'This vehicle is currently under maintenance.'
+                elif Booking.has_conflict(vehicle, start_date, end_date):
+                    context['error'] = 'This vehicle is already booked for the selected dates.'
+                else:
+                    total_amount = context['pricing']['total']
+                    with transaction.atomic():
+                        booking = Booking.objects.create(
+                            customer=customer,
+                            vehicle=vehicle,
+                            pickup_location=form.cleaned_data['pickup_location'],
+                            dropoff_location=form.cleaned_data['dropoff_location'],
+                            start_date=start_date,
+                            end_date=end_date,
+                            total_amount=total_amount,
+                            status='Pending',
+                        )
+                        for extra in selected_extras:
+                            BookingExtra.objects.create(
+                                booking=booking,
+                                service=extra,
+                                unit_price=extra.price,
+                                pricing_mode=extra.pricing_mode,
+                                total_amount=extra.calculate_total(context['pricing']['total_days']),
+                            )
+                        Payment.objects.create(
+                            booking=booking,
+                            amount=total_amount,
+                            status='Pending',
+                        )
+                        if form.cleaned_data['delivery_location']:
+                            DeliveryAgreement.objects.create(
+                                booking=booking,
+                                delivery_location=form.cleaned_data['delivery_location'],
+                                delivery_date=start_date,
+                            )
+                        vehicle.refresh_availability()
+
+                    context['success'] = 'Booking created successfully. Payment is pending confirmation.'
+                    context['booking'] = booking
+                    context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
+            else:
+                start_date = form.data.get('start_date')
+                end_date = form.data.get('end_date')
+                selected_extras = list(available_extras.filter(id__in=request.POST.getlist('selected_extras')))
+                context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
+                if start_date and end_date:
+                    try:
+                        parsed_start = date.fromisoformat(start_date)
+                        parsed_end = date.fromisoformat(end_date)
+                        context['pricing'] = build_pricing(vehicle, parsed_start, parsed_end, selected_extras)
+                    except ValueError:
+                        pass
+        if context['document_form'] is None:
+            context['document_form'] = DocumentUploadForm(instance=document)
     elif request.user.is_authenticated:
         customer = Customer.objects.filter(user=request.user).first()
         if customer:
             document = Document.objects.filter(customer=customer).first()
             context['document_status'] = document.verification_status if document else 'Missing'
+            context['document_form'] = DocumentUploadForm(instance=document)
+    else:
+        context['document_form'] = DocumentUploadForm()
 
     return render(request, 'booking.html', context)
 

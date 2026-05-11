@@ -160,6 +160,9 @@ main {
     font-weight: 700;
     transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
     cursor: pointer;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .primary-button {
@@ -264,6 +267,7 @@ main {
     margin: 0;
     font-size: clamp(2.8rem, 5vw, 4.7rem);
     line-height: 1.02;
+    overflow-wrap: anywhere;
 }
 
 .hero-copy h1 span,
@@ -441,6 +445,7 @@ main {
 .section-heading h2 {
     margin: 0 0 8px;
     font-size: clamp(2rem, 4vw, 3rem);
+    overflow-wrap: anywhere;
 }
 
 .section-heading p,
@@ -615,6 +620,7 @@ main {
     justify-content: space-between;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .vehicle-topline h3,
@@ -622,6 +628,7 @@ main {
 .detail-sidebar h1 {
     margin: 0;
     font-size: 1.5rem;
+    overflow-wrap: anywhere;
 }
 
 .status-pill {
@@ -698,6 +705,7 @@ main {
 .pricing-panel,
 .sticky-card {
     padding: 24px;
+    min-width: 0;
 }
 
 .filter-panel h2,
@@ -947,6 +955,10 @@ main {
     background: var(--surface-soft);
 }
 
+.booking-history-card > * {
+    min-width: 0;
+}
+
 .booking-history-card h3 {
     margin: 0 0 8px;
 }
@@ -985,7 +997,9 @@ main {
     color: #fff;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: 22px;
+    overflow: auto;
 }
 
 .auth-panels {
@@ -1007,6 +1021,29 @@ main {
 .stack-form {
     display: grid;
     gap: 16px;
+}
+
+.extra-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.extra-choice div,
+.extra-card p,
+.benefit-stack-item p,
+.booking-history-card p,
+.booking-history-card span,
+.section-heading p {
+    overflow-wrap: anywhere;
+}
+
+.extra-card > span {
+    margin-left: auto;
+    text-align: right;
+    flex: 0 0 auto;
 }
 
 .rating-row {
@@ -1075,6 +1112,33 @@ main {
 
     .nav-shell {
         min-height: 76px;
+        gap: 10px;
+    }
+
+    .brand {
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .brand strong {
+        font-size: 1.2rem;
+    }
+
+    .brand small {
+        font-size: 0.68rem;
+    }
+
+    .nav-actions {
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .nav-actions .ghost-button,
+    .nav-actions .primary-button {
+        min-height: 42px;
+        padding: 0 14px;
+        font-size: 0.95rem;
+        white-space: nowrap;
     }
 
     .hero-section {
@@ -1134,6 +1198,6 @@ main {
     }
 
     .auth-visual {
-        min-height: 520px;
+        min-height: 860px;
     }
 }
