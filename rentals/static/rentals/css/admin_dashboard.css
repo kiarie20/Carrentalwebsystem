@@ -695,3 +695,180 @@ button {
         height: 128px;
     }
 }
+
+/* Premium Theme Refresh - 2026-05-12 */
+:root {
+    --bg: #e4ebf3;
+    --surface: rgba(255, 255, 255, 0.86);
+    --surface-soft: rgba(241, 246, 251, 0.86);
+    --line: rgba(93, 112, 140, 0.16);
+    --text: #0d1728;
+    --muted: #617188;
+    --nav: #07111d;
+    --nav-soft: #0b1b2c;
+    --primary: #0d8c81;
+    --primary-soft: rgba(13, 140, 129, 0.14);
+    --green: #1e9a71;
+    --green-soft: rgba(30, 154, 113, 0.14);
+    --violet: #7c5cff;
+    --violet-soft: rgba(124, 92, 255, 0.14);
+    --gold: #d3a04b;
+    --gold-soft: rgba(211, 160, 75, 0.16);
+    --rose: #e35d5d;
+    --rose-soft: rgba(227, 93, 93, 0.14);
+    --shadow: 0 22px 52px rgba(7, 16, 30, 0.08);
+}
+
+body {
+    background:
+        radial-gradient(circle at top left, rgba(13, 140, 129, 0.1), transparent 22%),
+        radial-gradient(circle at top right, rgba(211, 160, 75, 0.12), transparent 22%),
+        linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
+}
+
+.dashboard-sidebar {
+    background:
+        radial-gradient(circle at top left, rgba(13, 140, 129, 0.18), transparent 20%),
+        radial-gradient(circle at bottom right, rgba(211, 160, 75, 0.12), transparent 24%),
+        linear-gradient(180deg, #06111d 0%, #091726 52%, #0d2130 100%);
+}
+
+.dashboard-brand-mark {
+    background:
+        linear-gradient(150deg, #0b1727 0%, #0d8c81 62%, #d3a04b 150%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 14px 28px rgba(4, 10, 20, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.dashboard-nav a {
+    border: 1px solid transparent;
+    transition: background 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
+}
+
+.dashboard-nav a:hover,
+.dashboard-nav a.is-active {
+    background: linear-gradient(135deg, rgba(13, 140, 129, 0.92) 0%, rgba(12, 110, 101, 0.98) 56%, rgba(211, 160, 75, 0.9) 160%);
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: translateX(2px);
+}
+
+.admin-user-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin-avatar {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.dashboard-main {
+    padding: 30px 30px 34px;
+}
+
+.topbar-search input,
+.topbar-date {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(93, 112, 140, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.metric-card,
+.dashboard-panel {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 248, 252, 0.88) 100%);
+    border-color: rgba(255, 255, 255, 0.34);
+    box-shadow: 0 24px 56px rgba(7, 16, 30, 0.08);
+    backdrop-filter: blur(18px);
+}
+
+.metric-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before,
+.dashboard-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.metric-card::before {
+    background:
+        radial-gradient(circle at top right, rgba(13, 140, 129, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 26%);
+}
+
+.metric-icon {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.dashboard-panel {
+    position: relative;
+}
+
+.dashboard-panel::before {
+    background:
+        radial-gradient(circle at top right, rgba(211, 160, 75, 0.06), transparent 18%),
+        radial-gradient(circle at bottom left, rgba(13, 140, 129, 0.05), transparent 20%);
+}
+
+.panel-header,
+.chart-legend,
+.status-overview,
+.ranking-list,
+.table-wrap,
+.metric-card > *,
+.dashboard-panel > * {
+    position: relative;
+    z-index: 1;
+}
+
+.panel-tag,
+.panel-link {
+    background: rgba(13, 140, 129, 0.08);
+    border-color: rgba(13, 140, 129, 0.12);
+    color: var(--primary);
+}
+
+.line-chart line {
+    stroke: #dde6ef;
+}
+
+.line-chart .series-secondary {
+    stroke: #a3afbf;
+}
+
+.status-donut {
+    box-shadow: 0 20px 44px rgba(7, 16, 30, 0.08);
+}
+
+.status-donut-center {
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+        inset 0 0 0 1px rgba(220, 229, 240, 0.88),
+        0 10px 24px rgba(7, 16, 30, 0.08);
+}
+
+.dashboard-table th,
+.dashboard-table td {
+    border-bottom-color: rgba(220, 229, 240, 0.86);
+}
+
+.dashboard-table tbody tr:hover td {
+    background: rgba(13, 140, 129, 0.03);
+}
+
+.ranking-item {
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(244, 248, 252, 0.72);
+    border: 1px solid rgba(220, 229, 240, 0.72);
+}
+
+.ranking-position {
+    background: rgba(13, 140, 129, 0.1);
+}
