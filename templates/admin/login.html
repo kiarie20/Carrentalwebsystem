@@ -76,5 +76,48 @@
             </section>
         </div>
     </main>
+    <script>
+        (function () {
+            function getCookie(name) {
+                const cookies = document.cookie ? document.cookie.split('; ') : [];
+                for (const cookie of cookies) {
+                    const parts = cookie.split('=');
+                    const key = parts.shift();
+                    if (key === name) {
+                        return decodeURIComponent(parts.join('='));
+                    }
+                }
+                return '';
+            }
+
+            const loginForm = document.getElementById('login-form');
+            if (!loginForm) {
+                return;
+            }
+
+            const csrfField = loginForm.querySelector('input[name="csrfmiddlewaretoken"]');
+            if (!csrfField) {
+                return;
+            }
+
+            loginForm.addEventListener('submit', function () {
+                const csrfCookie = getCookie('csrftoken');
+                if (csrfCookie) {
+                    csrfField.value = csrfCookie;
+                }
+            });
+
+            window.addEventListener('pageshow', function (event) {
+                const navigationEntries = window.performance && window.performance.getEntriesByType
+                    ? window.performance.getEntriesByType('navigation')
+                    : [];
+                const isBackForward = navigationEntries.length > 0 && navigationEntries[0].type === 'back_forward';
+
+                if (event.persisted || isBackForward) {
+                    window.location.reload();
+                }
+            });
+        }());
+    </script>
 </body>
 </html>
