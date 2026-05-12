@@ -635,6 +635,96 @@ main {
     padding: 28px 0 12px;
 }
 
+.process-section {
+    margin-top: 28px;
+    padding: 26px 0 8px;
+}
+
+.process-section-heading {
+    max-width: 720px;
+    margin-bottom: 28px;
+}
+
+.process-section-heading h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: clamp(2.5rem, 4.5vw, 4rem);
+    line-height: 1.04;
+}
+
+.process-section-heading p {
+    margin: 18px 0 0;
+    color: var(--text);
+    font-size: 1.15rem;
+    line-height: 1.7;
+}
+
+.process-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.process-card {
+    min-height: 100%;
+    padding: 34px 36px 32px;
+    border-radius: 24px;
+    background: #fff;
+    border: 1px solid rgba(214, 221, 234, 0.95);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.process-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 58px rgba(15, 23, 42, 0.1);
+    border-color: rgba(83, 101, 255, 0.2);
+}
+
+.process-card-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.process-step-number {
+    font-size: 3rem;
+    line-height: 1;
+    font-weight: 800;
+    color: #5b5df8;
+}
+
+.process-step-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 14px;
+    background: rgba(235, 239, 255, 0.95);
+    color: #5b6678;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.process-card h3 {
+    margin: 10px 0 16px;
+    font-size: 1.25rem;
+    line-height: 1.25;
+}
+
+.process-card p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+    font-size: 1rem;
+}
+
 .benefits-section {
     position: relative;
     margin-top: 28px;
@@ -1540,6 +1630,7 @@ main {
     .vehicle-grid,
     .compact-grid,
     .benefit-grid,
+    .process-grid,
     .icon-grid,
     .auth-card-grid,
     .hero-stats-grid {
@@ -1627,6 +1718,7 @@ main {
     .vehicle-grid,
     .compact-grid,
     .benefit-grid,
+    .process-grid,
     .icon-grid,
     .spec-grid,
     .summary-grid,
@@ -1664,7 +1756,8 @@ main {
 
     .hero-spotlight-body,
     .story-card,
-    .page-hero-panel {
+    .page-hero-panel,
+    .process-card {
         padding: 22px;
     }
 

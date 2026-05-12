@@ -17,6 +17,8 @@ class PublicPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreater(Vehicle.objects.count(), 0)
         self.assertContains(response, 'Featured Fleet')
+        self.assertContains(response, 'How it works')
+        self.assertContains(response, 'Verify Identity')
 
     def test_admin_login_page_shows_staff_only_message(self):
         response = self.client.get(f"{reverse('admin:login')}?next={reverse('admin_dashboard')}")
