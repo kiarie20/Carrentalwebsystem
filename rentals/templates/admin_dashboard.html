@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RIRI Admin Dashboard</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260512-2">
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260513-1">
 </head>
 <body class="admin-dashboard-body">
     <div class="dashboard-shell">
@@ -20,6 +20,7 @@
 
             <nav class="dashboard-nav">
                 <a class="is-active" href="{% url 'admin_dashboard' %}">Dashboard</a>
+                <a href="{% url 'admin_reports' %}">Reports</a>
                 <a href="{% url 'admin:rentals_vehicle_changelist' %}">Cars</a>
                 <a href="{% url 'admin:rentals_booking_changelist' %}">Bookings</a>
                 <a href="{% url 'admin:rentals_customer_changelist' %}">Customers</a>

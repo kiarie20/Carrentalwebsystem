@@ -1,6 +1,35 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+
+
+BOOKING_SERVICE_OPTIONS = {
+    'self_drive': {
+        'label': 'Self Drive',
+        'description': 'Drive the vehicle yourself and manage the trip on your own schedule.',
+        'price': Decimal('0.00'),
+        'pricing_mode': 'flat',
+    },
+    'chauffeur_drive': {
+        'label': 'Chauffeur Service',
+        'description': 'A professional driver handles the trip for business meetings, airport transfers, or city appointments.',
+        'price': Decimal('4500.00'),
+        'pricing_mode': 'daily',
+    },
+    'airport_pickup': {
+        'label': 'Airport Pick-up',
+        'description': 'Meet-and-greet collection from JKIA or Wilson Airport to start the rental smoothly.',
+        'price': Decimal('3500.00'),
+        'pricing_mode': 'flat',
+    },
+}
+
+SERVICE_TYPE_CHOICES = [
+    (code, details['label'])
+    for code, details in BOOKING_SERVICE_OPTIONS.items()
+]
 
 
 class Customer(models.Model):
@@ -125,9 +154,15 @@ class Booking(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE)
     pickup_location = models.CharField(max_length=120, blank=True, default='Nairobi, Kenya')
+    pickup_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    pickup_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     dropoff_location = models.CharField(max_length=120, blank=True, default='Nairobi, Kenya')
+    dropoff_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    dropoff_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     start_date = models.DateField()
     end_date = models.DateField()
+    service_type = models.CharField(max_length=30, choices=SERVICE_TYPE_CHOICES, default='self_drive')
+    service_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -165,6 +200,11 @@ class Booking(models.Model):
         self.cancelled_at = timezone.now()
         self.cancel_reason = reason.strip()
         self.save(update_fields=['status', 'cancelled_at', 'cancel_reason'])
+        self.vehicle.refresh_availability()
+
+    def mark_confirmed(self):
+        self.status = 'Confirmed'
+        self.save(update_fields=['status'])
         self.vehicle.refresh_availability()
 
 
@@ -217,13 +257,33 @@ class Payment(models.Model):
 
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    provider = models.CharField(max_length=30, default='Manual')
     payment_method = models.CharField(max_length=50, default='M-Pesa')
+    payer_phone = models.CharField(max_length=20, blank=True)
     transaction_code = models.CharField(max_length=100, blank=True)
+    merchant_request_id = models.CharField(max_length=120, blank=True)
+    checkout_request_id = models.CharField(max_length=120, blank=True)
+    gateway_response = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     paid_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.booking} - {self.status}"
+
+    def mark_paid(self, payment_method=None, transaction_code=''):
+        self.status = 'Paid'
+        if payment_method:
+            self.payment_method = payment_method
+        self.transaction_code = transaction_code.strip()
+        self.paid_at = timezone.now()
+        self.save(update_fields=['status', 'payment_method', 'transaction_code', 'paid_at'])
+
+    def mark_failed(self, payment_method=None, gateway_response=''):
+        self.status = 'Failed'
+        if payment_method:
+            self.payment_method = payment_method
+        self.gateway_response = gateway_response
+        self.save(update_fields=['status', 'payment_method', 'gateway_response'])
 
 
 class DeliveryAgreement(models.Model):

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}RIRI Car Rentals | Payment{% endblock %}
+
+{% block content %}
+<section class="page-section shell">
+    <div class="detail-flow-stack">
+        <nav class="breadcrumbs">
+            <a href="{% url 'home' %}">Home</a>
+            <span>/</span>
+            <a href="{% url 'account_dashboard' %}">My Account</a>
+            <span>/</span>
+            <strong>Payment</strong>
+        </nav>
+
+        <div class="section-heading">
+            <span class="section-kicker">Payment Step</span>
+            <h1>Complete payment for {{ booking.vehicle.name }}</h1>
+            <p>Your booking has been reserved. Confirm payment to lock in the trip and move the booking into a confirmed state.</p>
+        </div>
+
+        {% if error %}
+            <div class="alert-card alert-error">
+                <strong>{{ error }}</strong>
+            </div>
+        {% endif %}
+
+        <div class="payment-layout">
+            <section class="content-panel">
+                <div class="booking-vehicle">
+                    {% if booking.vehicle.primary_image_url %}
+                        <img src="{{ booking.vehicle.primary_image_url }}" alt="{{ booking.vehicle.name }}">
+                    {% endif %}
+                    <div>
+                        <h2>{{ booking.vehicle.name }}</h2>
+                        <p class="vehicle-meta">{{ booking.vehicle.vehicle_type }} . {{ booking.vehicle.transmission }} . {{ booking.vehicle.fuel_type }}</p>
+                        <strong class="detail-price">KES {{ booking.vehicle.price_per_day|floatformat:0|intcomma }} <span>/ day</span></strong>
+                    </div>
+                </div>
+
+                <div class="summary-grid detail-summary-grid">
+                    <div>
+                        <span>Booking ID</span>
+                        <strong>#BK{{ booking.id }}</strong>
+                    </div>
+                    <div>
+                        <span>Status</span>
+                        <strong>{{ booking.status }}</strong>
+                    </div>
+                    <div>
+                        <span>Travel Dates</span>
+                        <strong>{{ booking.start_date }} to {{ booking.end_date }}</strong>
+                    </div>
+                    <div>
+                        <span>Main Service</span>
+                        <strong>{{ booking.get_service_type_display }}</strong>
+                    </div>
+                    <div>
+                        <span>Pick-up / Drop-off</span>
+                        <strong>{{ booking.pickup_location }} to {{ booking.dropoff_location }}</strong>
+                    </div>
+                </div>
+
+                {% if selected_extras %}
+                    <div class="selected-extras-summary">
+                        <h3>Selected Extra Services</h3>
+                        {% for item in selected_extras %}
+                            <div class="pricing-row">
+                                <span>{{ item.service.name }}</span>
+                                <strong>KES {{ item.total_amount|floatformat:0|intcomma }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if delivery_agreement %}
+                    <div class="alert-card">
+                        <strong>Delivery arrangement</strong>
+                        <p>The vehicle is set to be delivered to {{ delivery_agreement.delivery_location }} on {{ delivery_agreement.delivery_date }}. The handover agreement will be signed when the vehicle is released.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="content-panel">
+                <div class="section-heading compact-heading">
+                    <h2>Payment Details</h2>
+                    <p>Use your actual transaction reference so staff can verify and reconcile the payment quickly.</p>
+                </div>
+
+                {% if default_payment_method == 'M-Pesa' and mpesa_ready %}
+                    <div class="alert-card">
+                        <strong>M-Pesa STK push is enabled.</strong>
+                        <p>Once you submit this form, the customer should receive an M-Pesa payment prompt on their phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.</p>
+                    </div>
+                {% elif not mpesa_ready %}
+                    <div class="alert-card">
+                        <strong>Demo payment mode is active.</strong>
+                        <p>Live Daraja credentials are not configured yet, so this installation records the payment reference and confirms the booking locally for testing and presentation.</p>
+                    </div>
+                {% endif %}
+
+                <form method="post" class="stack-form">
+                    {% csrf_token %}
+                    <div class="field-group">
+                        <label for="{{ payment_form.payment_method.id_for_label }}">Payment Method</label>
+                        {{ payment_form.payment_method }}
+                    </div>
+                    <div class="field-group">
+                        <label for="{{ payment_form.payer_phone.id_for_label }}">M-Pesa / Payer Phone</label>
+                        {{ payment_form.payer_phone }}
+                    </div>
+                    <div class="field-group">
+                        <label for="{{ payment_form.transaction_code.id_for_label }}">Transaction Reference</label>
+                        {{ payment_form.transaction_code }}
+                    </div>
+                    <div class="checkbox-field">
+                        <label>
+                            {{ payment_form.confirm_terms }}
+                            <span>I confirm that the submitted payment reference is correct.</span>
+                        </label>
+                    </div>
+                    {% if payment_form.errors %}
+                        <div class="form-errors">
+                            {% for field in payment_form %}
+                                {% for error in field.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in payment_form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <button class="primary-button full-width" type="submit">Confirm Payment</button>
+                </form>
+            </section>
+
+            <aside class="pricing-panel">
+                <div class="pricing-row">
+                    <span>Rental Days</span>
+                    <strong>{{ totals.total_days }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>Rental Subtotal</span>
+                    <strong>KES {{ totals.rental_subtotal|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>{{ totals.service.name }}</span>
+                    <strong>KES {{ totals.service.total|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>Extra Services</span>
+                    <strong>KES {{ totals.extras_total|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>Taxes & Fees</span>
+                    <strong>KES {{ totals.taxes|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row total-row">
+                    <span>Total Amount</span>
+                    <strong>KES {{ totals.total|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="alert-card payment-note-card">
+                    <strong>Current payment status</strong>
+                    <p>{{ payment.status }}</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+</section>
+{% endblock %}

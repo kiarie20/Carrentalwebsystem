@@ -1,0 +1,224 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RIRI Admin Reports</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260513-1">
+</head>
+<body class="admin-dashboard-body">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="dashboard-brand" href="{% url 'admin_dashboard' %}">
+                <span class="dashboard-brand-mark">R</span>
+                <span>
+                    <strong>RIRI</strong>
+                    <small>Admin Console</small>
+                </span>
+            </a>
+
+            <nav class="dashboard-nav">
+                <a href="{% url 'admin_dashboard' %}">Dashboard</a>
+                <a class="is-active" href="{% url 'admin_reports' %}">Reports</a>
+                <a href="{% url 'admin:rentals_vehicle_changelist' %}">Cars</a>
+                <a href="{% url 'admin:rentals_booking_changelist' %}">Bookings</a>
+                <a href="{% url 'admin:rentals_customer_changelist' %}">Customers</a>
+                <a href="{% url 'admin:rentals_payment_changelist' %}">Payments</a>
+                <a href="{% url 'admin:rentals_document_changelist' %}">Documents</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="admin-user-card">
+                    <span class="admin-avatar">{{ request.user.username|first|upper }}</span>
+                    <div>
+                        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                        <small>{{ request.user.email|default:"Admin User" }}</small>
+                    </div>
+                </div>
+                <div class="sidebar-actions">
+                    <a href="{% url 'admin:index' %}">Django Admin</a>
+                    <a href="{% url 'home' %}">Public Site</a>
+                    <a href="{% url 'logout_user' %}">Logout</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="topbar-kicker">RIRI Car Rentals</p>
+                    <h1>Reports Center</h1>
+                    <div class="dashboard-role-badge">Staff Access</div>
+                </div>
+                <div class="topbar-tools">
+                    <div class="topbar-date">{{ today_label }}</div>
+                </div>
+            </header>
+
+            <section class="metric-grid compact-report-grid">
+                {% for card in report_cards %}
+                    <article class="metric-card tone-{{ card.tone }}">
+                        <span class="metric-icon">{{ card.glyph }}</span>
+                        <div class="metric-copy">
+                            <p>{{ card.label }}</p>
+                            <h2>{{ card.value }}</h2>
+                            <small>{{ card.note }}</small>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+
+            <section class="dashboard-grid lower-grid">
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Booking Status Summary</h2>
+                            <p>Quick operational overview of the booking pipeline.</p>
+                        </div>
+                        <div class="panel-header-actions">
+                            <a class="panel-link" href="{% url 'export_report_csv' 'bookings' %}">Export Bookings CSV</a>
+                        </div>
+                    </div>
+                    <div class="status-list">
+                        {% for row in booking_status_rows %}
+                            <div class="status-list-item">
+                                <span class="status-label">{{ row.label }}</span>
+                                <strong>{{ row.count|intcomma }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Document Verification Summary</h2>
+                            <p>See where customer verification currently stands.</p>
+                        </div>
+                        <div class="panel-header-actions">
+                            <a class="panel-link" href="{% url 'admin:rentals_document_changelist' %}">Review Documents</a>
+                        </div>
+                    </div>
+                    <div class="status-list">
+                        {% for row in document_status_rows %}
+                            <div class="status-list-item">
+                                <span class="status-label">{{ row.label }}</span>
+                                <strong>{{ row.count|intcomma }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="dashboard-grid lower-grid">
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Top Customers</h2>
+                            <p>Customers driving the most confirmed business.</p>
+                        </div>
+                        <a class="panel-link" href="{% url 'export_report_csv' 'customers' %}">Export Customers CSV</a>
+                    </div>
+                    <div class="ranking-list">
+                        {% for customer in top_customer_rows %}
+                            <div class="ranking-item report-ranking-item">
+                                <span class="ranking-position">{{ forloop.counter }}</span>
+                                <div class="ranking-copy">
+                                    <strong>{{ customer.user.get_full_name|default:customer.user.username }}</strong>
+                                    <small>{{ customer.total_bookings|default:0|intcomma }} bookings</small>
+                                </div>
+                                <div class="ranking-value">
+                                    <strong>KES {{ customer.total_spend|default:0|floatformat:0|intcomma }}</strong>
+                                    <small>confirmed spend</small>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No customer spend yet</h3>
+                                <p>Confirmed customer totals will appear here once payments are completed.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Fleet Utilisation</h2>
+                            <p>Vehicles generating the most bookings and paid revenue.</p>
+                        </div>
+                        <a class="panel-link" href="{% url 'export_report_csv' 'vehicles' %}">Export Vehicles CSV</a>
+                    </div>
+                    <div class="ranking-list">
+                        {% for vehicle in fleet_utilisation_rows %}
+                            <div class="ranking-item report-ranking-item">
+                                <span class="ranking-position">{{ forloop.counter }}</span>
+                                <div class="ranking-copy">
+                                    <strong>{{ vehicle.name }}</strong>
+                                    <small>{{ vehicle.active_bookings|default:0|intcomma }} tracked bookings</small>
+                                </div>
+                                <div class="ranking-value">
+                                    <strong>KES {{ vehicle.paid_revenue|default:0|floatformat:0|intcomma }}</strong>
+                                    <small>paid revenue</small>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No fleet activity yet</h3>
+                                <p>Vehicle revenue and utilisation will appear here once bookings are paid.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="dashboard-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Recent Payments</h2>
+                        <p>Latest payment records created in the system.</p>
+                    </div>
+                    <a class="panel-link" href="{% url 'export_report_csv' 'payments' %}">Export Payments CSV</a>
+                </div>
+
+                {% if recent_payments %}
+                    <div class="table-wrap">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Payment ID</th>
+                                    <th>Customer</th>
+                                    <th>Vehicle</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                    <th>Reference</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in recent_payments %}
+                                    <tr>
+                                        <td>#PY{{ payment.id }}</td>
+                                        <td>{{ payment.booking.customer.user.get_full_name|default:payment.booking.customer.user.username }}</td>
+                                        <td>{{ payment.booking.vehicle.name }}</td>
+                                        <td>{{ payment.payment_method }}</td>
+                                        <td><span class="booking-pill status-{{ payment.status|lower }}">{{ payment.status }}</span></td>
+                                        <td>{{ payment.transaction_code|default:"--" }}</td>
+                                        <td>KES {{ payment.amount|floatformat:0|intcomma }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-panel-state">
+                        <h3>No payments yet</h3>
+                        <p>Payments will appear here as soon as customers confirm them.</p>
+                    </div>
+                {% endif %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>

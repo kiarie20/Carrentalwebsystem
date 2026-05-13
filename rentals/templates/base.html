@@ -5,7 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}RIRI Car Rentals{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260512-2">
+    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260513-1">
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <header class="site-header">
@@ -66,5 +67,6 @@
             </div>
         </div>
     </footer>
+    {% block extra_scripts %}{% endblock %}
 </body>
 </html>

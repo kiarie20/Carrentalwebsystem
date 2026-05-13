@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -36,6 +37,8 @@ class BookingWorkflowTests(TestCase):
         self.customer.national_id_number = '12345678'
         self.customer.address = 'Nairobi'
         self.customer.save()
+        self.future_start = timezone.localdate() + timedelta(days=3)
+        self.future_end = self.future_start + timedelta(days=2)
         Document.objects.create(
             customer=self.customer,
             national_id_file=SimpleUploadedFile('id.pdf', b'id'),
@@ -75,30 +78,177 @@ class BookingWorkflowTests(TestCase):
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
+                'service_type': 'self_drive',
                 'pickup_location': 'Nairobi, Kenya',
+                'pickup_latitude': '-1.286389',
+                'pickup_longitude': '36.817223',
                 'dropoff_location': 'Nairobi, Kenya',
-                'start_date': '2026-05-10',
-                'end_date': '2026-05-12',
+                'dropoff_latitude': '-1.283330',
+                'dropoff_longitude': '36.816670',
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
                 'delivery_location': 'Westlands',
                 'selected_extras': [str(delivery_extra.id)],
             },
         )
 
-        self.assertEqual(response.status_code, 200)
         booking = Booking.objects.get()
+        self.assertRedirects(response, reverse('booking_payment', args=[booking.id]))
         payment = Payment.objects.get(booking=booking)
         booking_extra = BookingExtra.objects.get(booking=booking, service=delivery_extra)
         self.vehicle.refresh_from_db()
 
         self.assertEqual(booking.total_amount, Decimal('11000.00'))
         self.assertEqual(booking.status, 'Pending')
+        self.assertEqual(booking.service_type, 'self_drive')
+        self.assertEqual(booking.service_fee, Decimal('0.00'))
         self.assertEqual(booking.pickup_location, 'Nairobi, Kenya')
+        self.assertEqual(str(booking.pickup_latitude), '-1.286389')
+        self.assertEqual(str(booking.dropoff_longitude), '36.816670')
         self.assertEqual(payment.amount, Decimal('11000.00'))
         self.assertEqual(payment.status, 'Pending')
         self.assertEqual(booking_extra.total_amount, Decimal('2500.00'))
         self.assertEqual(self.vehicle.status, 'Booked')
-        self.assertEqual(self.vehicle.next_available_date, date(2026, 5, 12))
+        self.assertEqual(self.vehicle.next_available_date, self.future_end)
         self.assertTrue(hasattr(booking, 'deliveryagreement'))
+
+    def test_chauffeur_service_adds_daily_fee_to_booking_total(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+
+        response = self.client.post(
+            reverse('book_vehicle', args=[self.vehicle.id]),
+            {
+                'service_type': 'chauffeur_drive',
+                'pickup_location': 'Upper Hill, Nairobi',
+                'dropoff_location': 'Karen, Nairobi',
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
+            },
+        )
+
+        booking = Booking.objects.get()
+        payment = Payment.objects.get(booking=booking)
+
+        self.assertRedirects(response, reverse('booking_payment', args=[booking.id]))
+        self.assertEqual(booking.service_type, 'chauffeur_drive')
+        self.assertEqual(booking.service_fee, Decimal('13500.00'))
+        self.assertEqual(booking.total_amount, Decimal('23100.00'))
+        self.assertEqual(payment.amount, Decimal('23100.00'))
+
+    def test_payment_submission_marks_booking_paid_and_confirmed(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        start_date = timezone.localdate() + timedelta(days=3)
+        end_date = start_date + timedelta(days=2)
+        booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=start_date,
+            end_date=end_date,
+            total_amount=Decimal('7500.00'),
+            status='Pending',
+        )
+        payment = Payment.objects.create(
+            booking=booking,
+            amount=Decimal('7500.00'),
+            status='Pending',
+        )
+
+        response = self.client.post(
+            reverse('booking_payment', args=[booking.id]),
+            {
+                'payment_method': 'M-Pesa',
+                'payer_phone': '0712345678',
+                'transaction_code': 'QWE12345',
+                'confirm_terms': 'on',
+            },
+        )
+
+        self.assertRedirects(response, reverse('booking_confirmation', args=[booking.id]))
+        booking.refresh_from_db()
+        payment.refresh_from_db()
+        self.vehicle.refresh_from_db()
+
+        self.assertEqual(payment.status, 'Paid')
+        self.assertEqual(payment.transaction_code, 'QWE12345')
+        self.assertEqual(booking.status, 'Confirmed')
+        self.assertEqual(self.vehicle.status, 'Booked')
+
+    def test_booking_confirmation_redirects_if_payment_not_done(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=timezone.localdate() + timedelta(days=2),
+            end_date=timezone.localdate() + timedelta(days=4),
+            total_amount=Decimal('7500.00'),
+            status='Pending',
+        )
+        Payment.objects.create(
+            booking=booking,
+            amount=Decimal('7500.00'),
+            status='Pending',
+        )
+
+        response = self.client.get(reverse('booking_confirmation', args=[booking.id]))
+
+        self.assertRedirects(response, reverse('booking_payment', args=[booking.id]))
+
+    def test_mpesa_callback_marks_pending_payment_paid(self):
+        booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=timezone.localdate() + timedelta(days=5),
+            end_date=timezone.localdate() + timedelta(days=7),
+            total_amount=Decimal('8000.00'),
+            status='Pending',
+        )
+        payment = Payment.objects.create(
+            booking=booking,
+            amount=Decimal('8000.00'),
+            payment_method='M-Pesa',
+            provider='M-Pesa',
+            status='Pending',
+            checkout_request_id='checkout-123',
+            merchant_request_id='merchant-123',
+        )
+
+        response = self.client.post(
+            reverse('mpesa_callback'),
+            data=json.dumps(
+                {
+                    'Body': {
+                        'stkCallback': {
+                            'MerchantRequestID': 'merchant-123',
+                            'CheckoutRequestID': 'checkout-123',
+                            'ResultCode': 0,
+                            'ResultDesc': 'The service request is processed successfully.',
+                            'CallbackMetadata': {
+                                'Item': [
+                                    {'Name': 'Amount', 'Value': 8000},
+                                    {'Name': 'MpesaReceiptNumber', 'Value': 'QXE4455'},
+                                    {'Name': 'PhoneNumber', 'Value': 254712345678},
+                                ]
+                            },
+                        }
+                    }
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        booking.refresh_from_db()
+        self.assertEqual(payment.status, 'Paid')
+        self.assertEqual(payment.transaction_code, 'QXE4455')
+        self.assertEqual(payment.payer_phone, '254712345678')
+        self.assertEqual(booking.status, 'Confirmed')
 
     def test_booking_rejects_overlapping_dates(self):
         self.client.login(username='customer1@example.com', password='pass12345')
@@ -107,8 +257,8 @@ class BookingWorkflowTests(TestCase):
             vehicle=self.vehicle,
             pickup_location='Nairobi, Kenya',
             dropoff_location='Nairobi, Kenya',
-            start_date=date(2026, 5, 10),
-            end_date=date(2026, 5, 12),
+            start_date=self.future_start,
+            end_date=self.future_end,
             total_amount=Decimal('7500.00'),
             status='Confirmed',
         )
@@ -116,10 +266,11 @@ class BookingWorkflowTests(TestCase):
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
+                'service_type': 'self_drive',
                 'pickup_location': 'Nairobi, Kenya',
                 'dropoff_location': 'Nairobi, Kenya',
-                'start_date': '2026-05-11',
-                'end_date': '2026-05-13',
+                'start_date': (self.future_start + timedelta(days=1)).isoformat(),
+                'end_date': (self.future_end + timedelta(days=1)).isoformat(),
             },
         )
 
@@ -134,10 +285,11 @@ class BookingWorkflowTests(TestCase):
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
+                'service_type': 'self_drive',
                 'pickup_location': 'Nairobi, Kenya',
                 'dropoff_location': 'Nairobi, Kenya',
-                'start_date': '2026-05-10',
-                'end_date': '2026-05-12',
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
             },
         )
 
@@ -150,10 +302,11 @@ class BookingWorkflowTests(TestCase):
         response = self.client.post(
             reverse('book_vehicle', args=[self.vehicle.id]),
             {
+                'service_type': 'self_drive',
                 'pickup_location': 'Nairobi, Kenya',
                 'dropoff_location': 'Nairobi, Kenya',
-                'start_date': '2026-05-10',
-                'end_date': '2026-05-12',
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
                 'delivery_location': 'Westlands',
             },
         )
@@ -167,8 +320,8 @@ class BookingWorkflowTests(TestCase):
             {
                 'pickup_location': 'Nairobi, Kenya',
                 'dropoff_location': 'Nairobi, Kenya',
-                'start_date': '2026-05-10',
-                'end_date': '2026-05-12',
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
             },
         )
 
@@ -397,3 +550,14 @@ class AdminDashboardTests(TestCase):
         response = self.client.get(reverse('auth_page'))
 
         self.assertRedirects(response, reverse('admin_dashboard'))
+
+    def test_admin_reports_render_and_export_for_staff(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        report_response = self.client.get(reverse('admin_reports'))
+        export_response = self.client.get(reverse('export_report_csv', args=['payments']))
+
+        self.assertEqual(report_response.status_code, 200)
+        self.assertContains(report_response, 'Reports Center')
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response['Content-Type'], 'text/csv')

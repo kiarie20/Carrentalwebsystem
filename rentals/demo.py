@@ -159,10 +159,11 @@ SAMPLE_EXTRA_SERVICES = [
     {
         'code': 'airport_delivery',
         'name': 'Airport Pick-up / Drop-off',
-        'description': 'Delivery and handover at JKIA or Wilson Airport for travelers who need direct airport collection.',
+        'description': 'Legacy airport delivery option kept for old bookings. New airport requests now use the main service selection in the booking flow.',
         'price': Decimal('3500.00'),
         'pricing_mode': 'flat',
         'display_order': 2,
+        'is_active': False,
     },
     {
         'code': 'additional_driver',

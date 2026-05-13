@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}RIRI Car Rentals | Booking Confirmation{% endblock %}
+
+{% block content %}
+<section class="page-section shell">
+    <div class="detail-flow-stack">
+        <div class="confirmation-hero content-panel">
+            <span class="section-kicker">Booking Confirmed</span>
+            <h1>Your trip for {{ booking.vehicle.name }} is confirmed.</h1>
+            <p>Payment has been recorded and your reservation is now locked in. Keep this page for your booking reference and pickup details.</p>
+            <div class="confirmation-actions">
+                <a class="primary-button" href="{% url 'account_dashboard' %}">Go to My Account</a>
+                <a class="secondary-button" href="{% url 'car_list' %}">Browse More Cars</a>
+            </div>
+        </div>
+
+        <div class="payment-layout">
+            <section class="content-panel">
+                <div class="section-heading compact-heading">
+                    <h2>Booking Summary</h2>
+                    <p>Everything tied to this reservation in one place.</p>
+                </div>
+                <div class="summary-grid detail-summary-grid">
+                    <div>
+                        <span>Booking ID</span>
+                        <strong>#BK{{ booking.id }}</strong>
+                    </div>
+                    <div>
+                        <span>Vehicle</span>
+                        <strong>{{ booking.vehicle.name }}</strong>
+                    </div>
+                    <div>
+                        <span>Main Service</span>
+                        <strong>{{ booking.get_service_type_display }}</strong>
+                    </div>
+                    <div>
+                        <span>Travel Dates</span>
+                        <strong>{{ booking.start_date }} to {{ booking.end_date }}</strong>
+                    </div>
+                    <div>
+                        <span>Route</span>
+                        <strong>{{ booking.pickup_location }} to {{ booking.dropoff_location }}</strong>
+                    </div>
+                </div>
+
+                {% if selected_extras %}
+                    <div class="selected-extras-summary">
+                        <h3>Confirmed Extra Services</h3>
+                        {% for item in selected_extras %}
+                            <div class="pricing-row">
+                                <span>{{ item.service.name }}</span>
+                                <strong>KES {{ item.total_amount|floatformat:0|intcomma }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if delivery_agreement %}
+                    <div class="alert-card">
+                        <strong>Delivery Agreement</strong>
+                        <p>Delivery to {{ delivery_agreement.delivery_location }} is scheduled for {{ delivery_agreement.delivery_date }}. The rental agreement will be signed physically at handover.</p>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="content-panel">
+                <div class="section-heading compact-heading">
+                    <h2>Payment Confirmation</h2>
+                    <p>Your payment details were stored successfully.</p>
+                </div>
+                <div class="summary-grid detail-summary-grid">
+                    <div>
+                        <span>Payment Method</span>
+                        <strong>{{ payment.payment_method }}</strong>
+                    </div>
+                    <div>
+                        <span>Transaction Code</span>
+                        <strong>{{ payment.transaction_code }}</strong>
+                    </div>
+                    <div>
+                        <span>Payment Status</span>
+                        <strong>{{ payment.status }}</strong>
+                    </div>
+                    <div>
+                        <span>Paid At</span>
+                        <strong>{{ payment.paid_at }}</strong>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="pricing-panel">
+                <div class="pricing-row">
+                    <span>Rental Subtotal</span>
+                    <strong>KES {{ totals.rental_subtotal|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>{{ totals.service.name }}</span>
+                    <strong>KES {{ totals.service.total|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>Extra Services</span>
+                    <strong>KES {{ totals.extras_total|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row">
+                    <span>Taxes & Fees</span>
+                    <strong>KES {{ totals.taxes|floatformat:0|intcomma }}</strong>
+                </div>
+                <div class="pricing-row total-row">
+                    <span>Total Paid</span>
+                    <strong>KES {{ totals.total|floatformat:0|intcomma }}</strong>
+                </div>
+            </aside>
+        </div>
+    </div>
+</section>
+{% endblock %}

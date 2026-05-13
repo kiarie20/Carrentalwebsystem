@@ -56,6 +56,12 @@
                 </p>
             </div>
             <p>Document upload now happens during the booking process so verification is handled at the point of reservation.</p>
+            {% if document_review_notes %}
+                <div class="alert-card alert-error">
+                    <strong>Admin note</strong>
+                    <p>{{ document_review_notes }}</p>
+                </div>
+            {% endif %}
             <a class="primary-button" href="{% url 'car_list' %}">Start a Booking</a>
         </section>
     </div>
@@ -73,14 +79,35 @@
                         <div>
                             <h3>{{ booking.vehicle.name }}</h3>
                             <p>{{ booking.pickup_location }} to {{ booking.dropoff_location }}</p>
+                            <p>Service: {{ booking.get_service_type_display }}</p>
+                            {% if booking.booking_extras.all %}
+                                <p>
+                                    Extras:
+                                    {% for item in booking.booking_extras.all %}
+                                        {{ item.service.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
                         </div>
                         <div>
                             <span>{{ booking.start_date }} to {{ booking.end_date }}</span>
                             <strong>KES {{ booking.total_amount|floatformat:0|intcomma }}</strong>
+                            {% if booking.payment %}
+                                <span>Payment: {{ booking.payment.status }}{% if booking.payment.transaction_code %} - {{ booking.payment.transaction_code }}{% endif %}</span>
+                            {% endif %}
                         </div>
-                        <span class="status-pill {% if booking.status == 'Confirmed' or booking.status == 'Completed' %}status-available{% else %}status-busy{% endif %}">
-                            {{ booking.status }}
-                        </span>
+                        <div class="booking-history-actions">
+                            <span class="status-pill {% if booking.status == 'Confirmed' or booking.status == 'Completed' %}status-available{% else %}status-busy{% endif %}">
+                                {{ booking.status }}
+                            </span>
+                            {% if booking.payment and booking.payment.status != 'Paid' and booking.status != 'Cancelled' %}
+                                <a class="secondary-button" href="{% url 'booking_payment' booking.id %}">
+                                    {% if booking.payment.status == 'Failed' %}Retry Payment{% else %}Complete Payment{% endif %}
+                                </a>
+                            {% elif booking.payment and booking.payment.status == 'Paid' %}
+                                <a class="secondary-button" href="{% url 'booking_confirmation' booking.id %}">View Confirmation</a>
+                            {% endif %}
+                        </div>
                     </article>
                 {% endfor %}
             </div>

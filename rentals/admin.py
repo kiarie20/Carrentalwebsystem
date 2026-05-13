@@ -56,6 +56,8 @@ class BookingAdmin(admin.ModelAdmin):
         'vehicle',
         'pickup_location',
         'dropoff_location',
+        'service_type',
+        'service_fee',
         'start_date',
         'end_date',
         'total_amount',

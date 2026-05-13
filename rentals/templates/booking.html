@@ -3,6 +3,15 @@
 
 {% block title %}RIRI Car Rentals | Booking{% endblock %}
 
+{% block extra_head %}
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    >
+{% endblock %}
+
 {% block content %}
 <section class="page-section shell">
     <form method="post" enctype="multipart/form-data" class="booking-main booking-flow-stack" id="booking-form">
@@ -58,6 +67,13 @@
                 </div>
             {% endif %}
 
+            {% if request.user.is_authenticated and document_review_notes %}
+                <div class="alert-card alert-error">
+                    <strong>Verification note</strong>
+                    <p>{{ document_review_notes }}</p>
+                </div>
+            {% endif %}
+
             {% if request.user.is_authenticated and document_status != 'Approved' %}
                 <div class="content-panel">
                     <div class="section-heading compact-heading">
@@ -87,14 +103,51 @@
                 </div>
             {% endif %}
 
+            <div class="content-panel">
+                <div class="section-heading compact-heading">
+                    <h2>Choose Your Rental Service</h2>
+                    <p>Select the main service you want for this trip. Delivery remains under extra services below.</p>
+                </div>
+                <div class="service-option-grid">
+                    {% for service in service_options %}
+                        <label class="service-option-card {% if service.code == selected_service_type %}is-selected{% endif %}">
+                            <input
+                                type="radio"
+                                name="service_type"
+                                value="{{ service.code }}"
+                                {% if service.code == selected_service_type %}checked{% endif %}
+                            >
+                            <div class="service-option-copy">
+                                <div class="service-option-header">
+                                    <strong>{{ service.name }}</strong>
+                                    <span class="service-option-badge">{{ service.badge }}</span>
+                                </div>
+                                <p>{{ service.description }}</p>
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% if form.service_type.errors %}
+                    <div class="form-errors">
+                        {% for error in form.service_type.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
             <div class="booking-form-grid">
                 <div class="field-group">
                     <label for="{{ form.pickup_location.id_for_label }}">Pick-up Location</label>
                     {{ form.pickup_location }}
+                    {{ form.pickup_latitude }}
+                    {{ form.pickup_longitude }}
                 </div>
                 <div class="field-group">
                     <label for="{{ form.dropoff_location.id_for_label }}">Drop-off Location</label>
                     {{ form.dropoff_location }}
+                    {{ form.dropoff_latitude }}
+                    {{ form.dropoff_longitude }}
                 </div>
                 <div class="field-group">
                     <label for="{{ form.start_date.id_for_label }}">Pick-up Date</label>
@@ -105,19 +158,45 @@
                     {{ form.end_date }}
                 </div>
                 <div class="field-group field-span-2">
-                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (required when a delivery service is selected)</label>
+                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (only when Nairobi delivery is selected)</label>
                     {{ form.delivery_location }}
                 </div>
+                <p class="field-hint field-span-2">
+                    Enter the hotel, estate, office, terminal, or landmark in the address fields above. Use the map below only when you want to pin the exact gate, entrance, or meeting point.
+                </p>
                 {% if form.non_field_errors %}
                     <div class="field-span-2 form-errors">{{ form.non_field_errors }}</div>
                 {% endif %}
+            </div>
+
+            <div class="content-panel booking-map-panel">
+                <div class="section-heading compact-heading">
+                    <h2>Exact Pin on Map</h2>
+                    <p>The address fields above are still the main route details. This map is optional, but recommended when you want us to follow the exact gate, terminal, hotel entrance, or meeting point.</p>
+                </div>
+                <div class="map-selection-toolbar">
+                    <button class="secondary-button map-mode-button is-active" type="button" data-map-mode="pickup">Pin Exact Pick-up Point</button>
+                    <button class="secondary-button map-mode-button" type="button" data-map-mode="dropoff">Pin Exact Drop-off Point</button>
+                    <button class="ghost-button map-locate-button" type="button" id="locate-current-mode">Use My Current Location for Active Pin</button>
+                </div>
+                <div class="map-helper-grid">
+                    <div class="map-helper-card">
+                        <strong>Pick-up Address + Pin</strong>
+                        <p id="pickup-map-status">No exact pick-up pin yet. The address field above will still be used.</p>
+                    </div>
+                    <div class="map-helper-card">
+                        <strong>Drop-off Address + Pin</strong>
+                        <p id="dropoff-map-status">No exact drop-off pin yet. Switch mode only if you want to save a second precise point.</p>
+                    </div>
+                </div>
+                <div id="booking-location-map" class="booking-location-map" aria-label="Booking location map"></div>
             </div>
         </div>
 
         <div class="content-panel">
             <div class="section-heading compact-heading">
                 <h2>Optional Extra Services</h2>
-                <p>Add any services you want included before we prepare your booking summary and payment.</p>
+                <p>Add any extras you want included on top of the main rental service. Delivery stays here as an optional add-on.</p>
             </div>
             <div class="extras-list">
                 {% for extra in extra_services %}
@@ -172,6 +251,14 @@
 
         <div class="pricing-panel">
             <div class="pricing-row">
+                <span>Selected Service</span>
+                <strong>{{ pricing.service.name }}</strong>
+            </div>
+            <div class="pricing-row">
+                <span>Service Fee</span>
+                <strong>KES {{ pricing.service.total|floatformat:0|intcomma }}</strong>
+            </div>
+            <div class="pricing-row">
                 <span>Daily Rate</span>
                 <strong>KES {{ vehicle.price_per_day|floatformat:0|intcomma }}</strong>
             </div>
@@ -195,8 +282,182 @@
                 <span>Total Amount</span>
                 <strong>KES {{ pricing.total|floatformat:0|intcomma }}</strong>
             </div>
-            <button class="primary-button full-width" type="submit" name="action" value="booking">Proceed to Payment</button>
+            <button class="primary-button full-width" type="submit" name="action" value="booking">Continue to Payment</button>
         </div>
     </form>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <script>
+        (function () {
+            if (!window.L) {
+                return;
+            }
+
+            const mapElement = document.getElementById('booking-location-map');
+            if (!mapElement) {
+                return;
+            }
+
+            const pickupField = document.getElementById('{{ form.pickup_location.id_for_label }}');
+            const dropoffField = document.getElementById('{{ form.dropoff_location.id_for_label }}');
+            const pickupLatField = document.getElementById('{{ form.pickup_latitude.id_for_label }}');
+            const pickupLngField = document.getElementById('{{ form.pickup_longitude.id_for_label }}');
+            const dropoffLatField = document.getElementById('{{ form.dropoff_latitude.id_for_label }}');
+            const dropoffLngField = document.getElementById('{{ form.dropoff_longitude.id_for_label }}');
+            const pickupStatus = document.getElementById('pickup-map-status');
+            const dropoffStatus = document.getElementById('dropoff-map-status');
+            const modeButtons = Array.from(document.querySelectorAll('[data-map-mode]'));
+            const locateButton = document.getElementById('locate-current-mode');
+
+            let currentMode = 'pickup';
+            const map = L.map(mapElement).setView([-1.286389, 36.817223], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors',
+            }).addTo(map);
+
+            const markers = {
+                pickup: null,
+                dropoff: null,
+            };
+
+            function updateModeButtons() {
+                modeButtons.forEach((button) => {
+                    button.classList.toggle('is-active', button.dataset.mapMode === currentMode);
+                });
+            }
+
+            function updateStatus(mode, message) {
+                if (mode === 'pickup') {
+                    pickupStatus.textContent = message;
+                } else {
+                    dropoffStatus.textContent = message;
+                }
+            }
+
+            function setMarker(mode, lat, lng) {
+                if (markers[mode]) {
+                    markers[mode].setLatLng([lat, lng]);
+                } else {
+                    markers[mode] = L.marker([lat, lng], { draggable: true }).addTo(map);
+                    markers[mode].on('dragend', function (event) {
+                        const position = event.target.getLatLng();
+                        saveCoordinates(mode, position.lat, position.lng, true);
+                    });
+                }
+            }
+
+            async function reverseGeocode(lat, lng) {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error('Reverse geocoding failed.');
+                }
+                const data = await response.json();
+                return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            }
+
+            async function saveCoordinates(mode, lat, lng, fromDrag) {
+                setMarker(mode, lat, lng);
+                if (mode === 'pickup') {
+                    pickupLatField.value = lat.toFixed(6);
+                    pickupLngField.value = lng.toFixed(6);
+                    updateStatus('pickup', fromDrag ? 'Pick-up pin moved. Updating the exact location...' : 'Pick-up pin saved. Updating the exact location...');
+                } else {
+                    dropoffLatField.value = lat.toFixed(6);
+                    dropoffLngField.value = lng.toFixed(6);
+                    updateStatus('dropoff', fromDrag ? 'Drop-off pin moved. Updating the exact location...' : 'Drop-off pin saved. Updating the exact location...');
+                }
+
+                try {
+                    const address = await reverseGeocode(lat, lng);
+                    if (mode === 'pickup') {
+                        pickupField.value = address;
+                        updateStatus('pickup', `Exact pick-up point saved: ${address}`);
+                    } else {
+                        dropoffField.value = address;
+                        updateStatus('dropoff', `Exact drop-off point saved: ${address}`);
+                    }
+                } catch (error) {
+                    const fallbackText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    if (mode === 'pickup') {
+                        pickupField.value = pickupField.value || fallbackText;
+                        updateStatus('pickup', `Exact pick-up coordinates saved: ${fallbackText}`);
+                    } else {
+                        dropoffField.value = dropoffField.value || fallbackText;
+                        updateStatus('dropoff', `Exact drop-off coordinates saved: ${fallbackText}`);
+                    }
+                }
+            }
+
+            function hydrateExistingMarker(mode, latField, lngField) {
+                if (!latField.value || !lngField.value) {
+                    return;
+                }
+                const lat = parseFloat(latField.value);
+                const lng = parseFloat(lngField.value);
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    setMarker(mode, lat, lng);
+                    updateStatus(mode, `Exact pin already saved: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                }
+            }
+
+            map.on('click', function (event) {
+                saveCoordinates(currentMode, event.latlng.lat, event.latlng.lng, false);
+            });
+
+            modeButtons.forEach((button) => {
+                button.addEventListener('click', function () {
+                    currentMode = button.dataset.mapMode;
+                    updateModeButtons();
+                });
+            });
+
+            if (locateButton && navigator.geolocation) {
+                locateButton.addEventListener('click', function () {
+                    locateButton.disabled = true;
+                    navigator.geolocation.getCurrentPosition(
+                        function (position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            map.setView([lat, lng], 15);
+                            saveCoordinates(currentMode, lat, lng, false);
+                            locateButton.disabled = false;
+                        },
+                        function () {
+                            locateButton.disabled = false;
+                            updateStatus(currentMode, 'Could not access your current location. You can still place the exact pin manually on the map.');
+                        }
+                    );
+                });
+            } else if (locateButton) {
+                locateButton.disabled = true;
+            }
+
+            hydrateExistingMarker('pickup', pickupLatField, pickupLngField);
+            hydrateExistingMarker('dropoff', dropoffLatField, dropoffLngField);
+            if (markers.pickup || markers.dropoff) {
+                const bounds = [];
+                if (markers.pickup) bounds.push(markers.pickup.getLatLng());
+                if (markers.dropoff) bounds.push(markers.dropoff.getLatLng());
+                if (bounds.length) {
+                    map.fitBounds(bounds, { padding: [40, 40] });
+                }
+            }
+
+            updateModeButtons();
+        }());
+    </script>
 {% endblock %}

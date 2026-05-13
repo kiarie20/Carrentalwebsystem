@@ -374,6 +374,12 @@ button {
     font-weight: 700;
 }
 
+.panel-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 .chart-legend {
     display: flex;
     gap: 18px;
@@ -546,7 +552,17 @@ button {
     color: var(--green);
 }
 
+.status-paid {
+    background: rgba(18, 183, 106, 0.15);
+    color: var(--green);
+}
+
 .status-cancelled {
+    background: rgba(244, 63, 94, 0.14);
+    color: var(--rose);
+}
+
+.status-failed {
     background: rgba(244, 63, 94, 0.14);
     color: var(--rose);
 }
@@ -623,12 +639,24 @@ button {
     margin-bottom: 0;
 }
 
+.compact-report-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.report-ranking-item {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+
 @media (max-width: 1320px) {
     .metric-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .bottom-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .compact-report-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -671,7 +699,8 @@ button {
 
     .metric-grid,
     .bottom-metric-grid,
-    .dashboard-nav {
+    .dashboard-nav,
+    .compact-report-grid {
         grid-template-columns: 1fr;
     }
 

@@ -42,7 +42,12 @@
                     <span class="status-pill {% if vehicle.status == 'Available' %}status-available{% else %}status-busy{% endif %}">
                         {{ vehicle.status }}
                     </span>
-                    <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+                    {% if vehicle.status != 'Available' and vehicle.next_available_date %}
+                        <p class="availability-note">Next available: {{ vehicle.next_available_date|date:"d M Y" }}</p>
+                    {% endif %}
+                    <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">
+                        {% if vehicle.status == 'Available' %}Book Now{% else %}Reserve Future Dates{% endif %}
+                    </a>
                 </div>
             </div>
 

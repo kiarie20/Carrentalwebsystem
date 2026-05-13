@@ -96,9 +96,14 @@
                             <strong>KES {{ vehicle.price_per_day|floatformat:0|intcomma }}</strong>
                             <span>{{ vehicle.rating }}/5 ({{ vehicle.review_count }})</span>
                         </div>
+                        {% if vehicle.status != 'Available' and vehicle.next_available_date %}
+                            <p class="availability-note">Next available: {{ vehicle.next_available_date|date:"d M Y" }}</p>
+                        {% endif %}
                         <div class="vehicle-actions-row">
                             <a class="secondary-button" href="{% url 'car_detail' vehicle.id %}">View Details</a>
-                            <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">Book Now</a>
+                            <a class="primary-button" href="{% url 'book_vehicle' vehicle.id %}">
+                                {% if vehicle.status == 'Available' %}Book Now{% else %}Reserve Dates{% endif %}
+                            </a>
                         </div>
                     </div>
                 </article>

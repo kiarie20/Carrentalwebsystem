@@ -1,14 +1,17 @@
+import csv
 import json
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -21,8 +24,20 @@ from .forms import (
     CustomerProfileForm,
     CustomerRegistrationForm,
     DocumentUploadForm,
+    PaymentForm,
 )
-from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, Vehicle
+from .mpesa import MpesaConfigurationError, MpesaGatewayError, initiate_stk_push, mpesa_is_configured
+from .models import (
+    BOOKING_SERVICE_OPTIONS,
+    Booking,
+    BookingExtra,
+    Customer,
+    DeliveryAgreement,
+    Document,
+    ExtraService,
+    Payment,
+    Vehicle,
+)
 
 BENEFITS = [
     {'title': 'Wide Range of Cars', 'copy': 'Choose from economy to luxury vehicles.'},
@@ -78,13 +93,47 @@ def build_vehicle_specs(vehicle):
     ]
 
 
-def build_pricing(vehicle, start_date=None, end_date=None, selected_extras=None):
+def build_service_pricing(service_type, total_days, stored_total=None):
+    resolved_service_type = service_type if service_type in BOOKING_SERVICE_OPTIONS else 'self_drive'
+    service_config = BOOKING_SERVICE_OPTIONS[resolved_service_type]
+    if stored_total is None:
+        if service_config['pricing_mode'] == 'daily':
+            service_total = (service_config['price'] * total_days).quantize(Decimal('0.01'))
+        else:
+            service_total = service_config['price']
+    else:
+        service_total = stored_total
+    return {
+        'code': resolved_service_type,
+        'name': service_config['label'],
+        'description': service_config['description'],
+        'unit_price': service_config['price'],
+        'pricing_mode': service_config['pricing_mode'],
+        'pricing_label': 'per day' if service_config['pricing_mode'] == 'daily' else 'one-time',
+        'total': service_total,
+        'badge': 'Included' if service_total == Decimal('0.00') else (
+            f"KES {service_config['price']:,.0f} / day"
+            if service_config['pricing_mode'] == 'daily'
+            else f"KES {service_config['price']:,.0f} one-time"
+        ),
+    }
+
+
+def build_service_options(total_days):
+    return [
+        build_service_pricing(code, total_days)
+        for code in BOOKING_SERVICE_OPTIONS
+    ]
+
+
+def build_pricing(vehicle, start_date=None, end_date=None, service_type='self_drive', selected_extras=None):
     selected_extras = list(selected_extras or [])
     if start_date and end_date and end_date >= start_date:
         total_days = (end_date - start_date).days + 1
     else:
         total_days = 3
     subtotal = vehicle.price_per_day * total_days
+    service = build_service_pricing(service_type, total_days)
     extras_breakdown = []
     extras_total = Decimal('0.00')
     for extra in selected_extras:
@@ -101,12 +150,13 @@ def build_pricing(vehicle, start_date=None, end_date=None, selected_extras=None)
                 'total': extra_total,
             }
         )
-    taxable_amount = subtotal + extras_total
+    taxable_amount = subtotal + service['total'] + extras_total
     taxes = (taxable_amount * Decimal('0.10')).quantize(Decimal('0.01'))
     total = taxable_amount + taxes
     return {
         'total_days': total_days,
         'subtotal': subtotal,
+        'service': service,
         'selected_extras': extras_breakdown,
         'extras_total': extras_total,
         'taxes': taxes,
@@ -117,6 +167,26 @@ def build_pricing(vehicle, start_date=None, end_date=None, selected_extras=None)
 def format_currency(amount):
     amount = amount or Decimal('0.00')
     return f"KES {amount:,.0f}"
+
+
+def build_booking_totals(booking):
+    total_days = (booking.end_date - booking.start_date).days + 1
+    rental_subtotal = booking.vehicle.price_per_day * total_days
+    service_total = booking.service_fee or Decimal('0.00')
+    service = build_service_pricing(booking.service_type, total_days, stored_total=service_total)
+    extras_total = (
+        booking.booking_extras.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    )
+    taxes = booking.total_amount - rental_subtotal - service_total - extras_total
+    return {
+        'total_days': total_days,
+        'rental_subtotal': rental_subtotal,
+        'service': service,
+        'service_total': service_total,
+        'extras_total': extras_total,
+        'taxes': taxes,
+        'total': booking.total_amount,
+    }
 
 
 def build_chart_points(values, width=640, height=250, padding=28):
@@ -430,6 +500,165 @@ def admin_dashboard(request):
     return render(request, 'admin_dashboard.html', context)
 
 
+@staff_member_required(login_url='admin:login')
+def admin_reports(request):
+    today = timezone.localdate()
+    current_month_start = today.replace(day=1)
+
+    booking_status_rows = []
+    for status in ['Pending', 'Confirmed', 'Completed', 'Cancelled']:
+        booking_status_rows.append(
+            {
+                'label': status,
+                'count': Booking.objects.filter(status=status).count(),
+            }
+        )
+
+    document_status_rows = []
+    for status in ['Pending', 'Approved', 'Rejected']:
+        document_status_rows.append(
+            {
+                'label': status,
+                'count': Document.objects.filter(verification_status=status).count(),
+            }
+        )
+
+    top_customer_rows = (
+        Customer.objects.annotate(
+            total_spend=Sum('booking__total_amount', filter=Q(booking__status__in=['Confirmed', 'Completed'])),
+            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+        )
+        .select_related('user')
+        .order_by('-total_spend', '-total_bookings', 'user__username')[:8]
+    )
+
+    fleet_utilisation_rows = (
+        Vehicle.objects.annotate(
+            active_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+            paid_revenue=Sum('booking__payment__amount', filter=Q(booking__payment__status='Paid')),
+        )
+        .order_by('-active_bookings', '-paid_revenue', 'name')[:8]
+    )
+
+    recent_payments = Payment.objects.select_related('booking__customer__user', 'booking__vehicle').order_by('-id')[:10]
+
+    report_cards = [
+        {
+            'label': 'Paid Revenue This Month',
+            'value': format_currency(
+                Payment.objects.filter(status='Paid', paid_at__date__gte=current_month_start).aggregate(total=Sum('amount'))['total']
+                or Decimal('0.00')
+            ),
+            'note': 'Confirmed collections for the current month',
+            'tone': 'green',
+            'glyph': 'K',
+        },
+        {
+            'label': 'Pending Payments',
+            'value': format_currency(
+                Payment.objects.filter(status='Pending').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            ),
+            'note': 'Bookings still awaiting payment confirmation',
+            'tone': 'gold',
+            'glyph': 'P',
+        },
+        {
+            'label': 'Approved Documents',
+            'value': f"{Document.objects.filter(verification_status='Approved').count():,}",
+            'note': 'Customers fully verified for booking',
+            'tone': 'blue',
+            'glyph': 'D',
+        },
+        {
+            'label': 'Fleet Availability',
+            'value': f"{Vehicle.objects.filter(status='Available').count():,}",
+            'note': 'Vehicles immediately available to rent',
+            'tone': 'violet',
+            'glyph': 'F',
+        },
+    ]
+
+    context = {
+        'today_label': today.strftime('%d %b %Y'),
+        'report_cards': report_cards,
+        'booking_status_rows': booking_status_rows,
+        'document_status_rows': document_status_rows,
+        'top_customer_rows': top_customer_rows,
+        'fleet_utilisation_rows': fleet_utilisation_rows,
+        'recent_payments': recent_payments,
+    }
+    return render(request, 'admin_reports.html', context)
+
+
+@staff_member_required(login_url='admin:login')
+def export_report_csv(request, report_type):
+    today = timezone.localdate().isoformat()
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{report_type}-report-{today}.csv"'
+    writer = csv.writer(response)
+
+    if report_type == 'bookings':
+        writer.writerow(['Booking ID', 'Customer', 'Vehicle', 'Pick-up', 'Drop-off', 'Start Date', 'End Date', 'Status', 'Total Amount'])
+        for booking in Booking.objects.select_related('customer__user', 'vehicle').order_by('-created_at'):
+            writer.writerow([
+                booking.id,
+                booking.customer.user.username,
+                booking.vehicle.name,
+                booking.pickup_location,
+                booking.dropoff_location,
+                booking.start_date,
+                booking.end_date,
+                booking.status,
+                booking.total_amount,
+            ])
+        return response
+
+    if report_type == 'payments':
+        writer.writerow(['Payment ID', 'Booking ID', 'Customer', 'Vehicle', 'Method', 'Transaction Code', 'Status', 'Amount', 'Paid At'])
+        for payment in Payment.objects.select_related('booking__customer__user', 'booking__vehicle').order_by('-id'):
+            writer.writerow([
+                payment.id,
+                payment.booking_id,
+                payment.booking.customer.user.username,
+                payment.booking.vehicle.name,
+                payment.payment_method,
+                payment.transaction_code,
+                payment.status,
+                payment.amount,
+                payment.paid_at,
+            ])
+        return response
+
+    if report_type == 'vehicles':
+        writer.writerow(['Vehicle ID', 'Name', 'Model', 'Plate Number', 'Type', 'Status', 'Price Per Day', 'Next Available Date'])
+        for vehicle in Vehicle.objects.order_by('name'):
+            writer.writerow([
+                vehicle.id,
+                vehicle.name,
+                vehicle.model,
+                vehicle.plate_number,
+                vehicle.vehicle_type,
+                vehicle.status,
+                vehicle.price_per_day,
+                vehicle.next_available_date,
+            ])
+        return response
+
+    if report_type == 'customers':
+        writer.writerow(['Customer ID', 'Username', 'Phone', 'National ID', 'Address'])
+        for customer in Customer.objects.select_related('user').order_by('user__username'):
+            writer.writerow([
+                customer.id,
+                customer.user.username,
+                customer.phone,
+                customer.national_id_number,
+                customer.address,
+            ])
+        return response
+
+    return HttpResponse('Unknown report type.', status=404)
+
+
 @login_required(login_url='auth_page')
 def account_dashboard(request):
     customer = get_customer_for_user(request.user)
@@ -447,11 +676,17 @@ def account_dashboard(request):
     else:
         profile_form = CustomerProfileForm(instance=customer)
 
-    bookings = Booking.objects.filter(customer=customer).select_related('vehicle').order_by('-created_at')
+    bookings = (
+        Booking.objects.filter(customer=customer)
+        .select_related('vehicle', 'payment')
+        .prefetch_related('booking_extras__service')
+        .order_by('-created_at')
+    )
     context = {
         'active_page': 'account',
         'customer': customer,
         'document': document,
+        'document_review_notes': document.review_notes if document and document.review_notes else '',
         'profile_form': profile_form,
         'bookings': bookings,
     }
@@ -465,11 +700,16 @@ def book_vehicle(request, vehicle_id):
     today = timezone.localdate()
     default_end = today + timedelta(days=2)
     initial = {
+        'service_type': 'self_drive',
         'pickup_location': vehicle.pickup_location,
+        'pickup_latitude': None,
+        'pickup_longitude': None,
         'dropoff_location': vehicle.dropoff_location,
+        'dropoff_latitude': None,
+        'dropoff_longitude': None,
         'start_date': today,
         'end_date': default_end,
-        'delivery_location': vehicle.pickup_location,
+        'delivery_location': '',
     }
     form = BookingForm(initial=initial, extra_queryset=available_extras)
     context = {
@@ -477,6 +717,8 @@ def book_vehicle(request, vehicle_id):
         'vehicle': vehicle,
         'form': form,
         'pricing': build_pricing(vehicle),
+        'service_options': build_service_options(3),
+        'selected_service_type': 'self_drive',
         'benefits': BENEFITS,
         'extra_services': available_extras,
         'selected_extra_ids': [],
@@ -491,6 +733,7 @@ def book_vehicle(request, vehicle_id):
         customer = get_customer_for_user(request.user)
         document = Document.objects.filter(customer=customer).first()
         context['document_status'] = document.verification_status if document else 'Missing'
+        context['document_review_notes'] = document.review_notes if document and document.review_notes else ''
         action = request.POST.get('action', 'booking')
 
         if action == 'documents':
@@ -521,9 +764,18 @@ def book_vehicle(request, vehicle_id):
             elif form.is_valid():
                 start_date = form.cleaned_data['start_date']
                 end_date = form.cleaned_data['end_date']
+                service_type = form.cleaned_data['service_type']
                 selected_extras = list(form.cleaned_data['selected_extras'])
+                context['selected_service_type'] = service_type
                 context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
-                context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
+                context['pricing'] = build_pricing(
+                    vehicle,
+                    start_date,
+                    end_date,
+                    service_type=service_type,
+                    selected_extras=selected_extras,
+                )
+                context['service_options'] = build_service_options(context['pricing']['total_days'])
 
                 if vehicle.status == 'Maintenance':
                     context['error'] = 'This vehicle is currently under maintenance.'
@@ -536,9 +788,15 @@ def book_vehicle(request, vehicle_id):
                             customer=customer,
                             vehicle=vehicle,
                             pickup_location=form.cleaned_data['pickup_location'],
+                            pickup_latitude=form.cleaned_data.get('pickup_latitude'),
+                            pickup_longitude=form.cleaned_data.get('pickup_longitude'),
                             dropoff_location=form.cleaned_data['dropoff_location'],
+                            dropoff_latitude=form.cleaned_data.get('dropoff_latitude'),
+                            dropoff_longitude=form.cleaned_data.get('dropoff_longitude'),
                             start_date=start_date,
                             end_date=end_date,
+                            service_type=service_type,
+                            service_fee=context['pricing']['service']['total'],
                             total_amount=total_amount,
                             status='Pending',
                         )
@@ -562,20 +820,26 @@ def book_vehicle(request, vehicle_id):
                                 delivery_date=start_date,
                             )
                         vehicle.refresh_availability()
-
-                    context['success'] = 'Booking created successfully. Payment is pending confirmation.'
-                    context['booking'] = booking
-                    context['pricing'] = build_pricing(vehicle, start_date, end_date, selected_extras)
+                    return redirect('booking_payment', booking_id=booking.id)
             else:
                 start_date = form.data.get('start_date')
                 end_date = form.data.get('end_date')
+                selected_service_type = request.POST.get('service_type', 'self_drive')
+                context['selected_service_type'] = selected_service_type
                 selected_extras = list(available_extras.filter(id__in=request.POST.getlist('selected_extras')))
                 context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
                 if start_date and end_date:
                     try:
                         parsed_start = date.fromisoformat(start_date)
                         parsed_end = date.fromisoformat(end_date)
-                        context['pricing'] = build_pricing(vehicle, parsed_start, parsed_end, selected_extras)
+                        context['pricing'] = build_pricing(
+                            vehicle,
+                            parsed_start,
+                            parsed_end,
+                            service_type=selected_service_type,
+                            selected_extras=selected_extras,
+                        )
+                        context['service_options'] = build_service_options(context['pricing']['total_days'])
                     except ValueError:
                         pass
         if context['document_form'] is None:
@@ -585,11 +849,187 @@ def book_vehicle(request, vehicle_id):
         if customer:
             document = Document.objects.filter(customer=customer).first()
             context['document_status'] = document.verification_status if document else 'Missing'
+            context['document_review_notes'] = document.review_notes if document and document.review_notes else ''
             context['document_form'] = DocumentUploadForm(instance=document)
     else:
         context['document_form'] = DocumentUploadForm()
 
     return render(request, 'booking.html', context)
+
+
+@login_required(login_url='auth_page')
+def booking_payment(request, booking_id):
+    customer = get_customer_for_user(request.user)
+    booking = get_object_or_404(
+        Booking.objects.select_related('vehicle', 'payment'),
+        id=booking_id,
+        customer=customer,
+    )
+    payment = booking.payment
+    delivery_agreement = getattr(booking, 'deliveryagreement', None)
+    selected_extras = booking.booking_extras.select_related('service').all()
+
+    if payment.status == 'Paid':
+        return redirect('booking_confirmation', booking_id=booking.id)
+
+    initial = {
+        'payment_method': payment.payment_method or 'M-Pesa',
+        'payer_phone': customer.phone,
+    }
+    form = PaymentForm(initial=initial)
+    context = {
+        'active_page': 'account',
+        'booking': booking,
+        'payment': payment,
+        'payment_form': form,
+        'selected_extras': selected_extras,
+        'delivery_agreement': delivery_agreement,
+        'totals': build_booking_totals(booking),
+        'mpesa_ready': mpesa_is_configured(),
+        'default_payment_method': payment.payment_method or 'M-Pesa',
+    }
+
+    if request.method == 'POST':
+        form = PaymentForm(request.POST)
+        context['payment_form'] = form
+        if form.is_valid():
+            payment_method = form.cleaned_data['payment_method']
+            payer_phone = form.cleaned_data['payer_phone']
+            transaction_code = form.cleaned_data['transaction_code']
+
+            if payment_method == 'M-Pesa' and mpesa_is_configured():
+                try:
+                    gateway_response = initiate_stk_push(
+                        amount=payment.amount,
+                        phone_number=payer_phone,
+                        account_reference=f"BK{booking.id}",
+                        transaction_desc=settings.MPESA_TRANSACTION_DESC or 'Car rental payment',
+                    )
+                    payment.provider = 'M-Pesa'
+                    payment.payment_method = 'M-Pesa'
+                    payment.payer_phone = gateway_response['normalized_phone']
+                    payment.transaction_code = transaction_code
+                    payment.merchant_request_id = gateway_response.get('MerchantRequestID', '')
+                    payment.checkout_request_id = gateway_response.get('CheckoutRequestID', '')
+                    payment.gateway_response = json.dumps(gateway_response)
+                    payment.status = 'Pending'
+                    payment.save(
+                        update_fields=[
+                            'provider',
+                            'payment_method',
+                            'payer_phone',
+                            'transaction_code',
+                            'merchant_request_id',
+                            'checkout_request_id',
+                            'gateway_response',
+                            'status',
+                        ]
+                    )
+                    context['payment'] = payment
+                    context['success'] = gateway_response.get(
+                        'CustomerMessage',
+                        'M-Pesa prompt sent. Complete the payment on the customer phone to finish the booking.',
+                    )
+                    return render(request, 'payment.html', context)
+                except (MpesaConfigurationError, MpesaGatewayError) as exc:
+                    if settings.MPESA_DEMO_FALLBACK:
+                        with transaction.atomic():
+                            payment.provider = 'Demo'
+                            payment.payer_phone = payer_phone
+                            payment.gateway_response = str(exc)
+                            payment.save(update_fields=['provider', 'payer_phone', 'gateway_response'])
+                            payment.mark_paid(
+                                payment_method='M-Pesa',
+                                transaction_code=transaction_code,
+                            )
+                            if booking.status == 'Pending':
+                                booking.mark_confirmed()
+                        return redirect('booking_confirmation', booking_id=booking.id)
+                    context['error'] = str(exc)
+                    return render(request, 'payment.html', context)
+
+            with transaction.atomic():
+                payment.provider = 'Manual'
+                payment.payer_phone = payer_phone
+                payment.save(update_fields=['provider', 'payer_phone'])
+                payment.mark_paid(
+                    payment_method=payment_method,
+                    transaction_code=transaction_code,
+                )
+                if booking.status == 'Pending':
+                    booking.mark_confirmed()
+            return redirect('booking_confirmation', booking_id=booking.id)
+        context['error'] = 'Please correct the payment details below.'
+
+    return render(request, 'payment.html', context)
+
+
+@login_required(login_url='auth_page')
+def booking_confirmation(request, booking_id):
+    customer = get_customer_for_user(request.user)
+    booking = get_object_or_404(
+        Booking.objects.select_related('vehicle', 'payment'),
+        id=booking_id,
+        customer=customer,
+    )
+    payment = booking.payment
+    if payment.status != 'Paid':
+        return redirect('booking_payment', booking_id=booking.id)
+
+    context = {
+        'active_page': 'account',
+        'booking': booking,
+        'payment': payment,
+        'selected_extras': booking.booking_extras.select_related('service').all(),
+        'delivery_agreement': getattr(booking, 'deliveryagreement', None),
+        'totals': build_booking_totals(booking),
+    }
+    return render(request, 'booking_confirmation.html', context)
+
+
+@csrf_exempt
+def mpesa_callback(request):
+    if request.method != 'POST':
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Method not allowed.'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Invalid JSON payload.'}, status=400)
+
+    callback = payload.get('Body', {}).get('stkCallback', {})
+    checkout_request_id = callback.get('CheckoutRequestID', '')
+    merchant_request_id = callback.get('MerchantRequestID', '')
+    result_code = callback.get('ResultCode')
+    result_desc = callback.get('ResultDesc', '')
+
+    payment = (
+        Payment.objects.filter(checkout_request_id=checkout_request_id).select_related('booking', 'booking__vehicle').first()
+        or Payment.objects.filter(merchant_request_id=merchant_request_id).select_related('booking', 'booking__vehicle').first()
+    )
+    if not payment:
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Payment record not found.'}, status=404)
+
+    payment.provider = 'M-Pesa'
+    payment.gateway_response = json.dumps(payload)
+    payment.save(update_fields=['provider', 'gateway_response'])
+
+    if str(result_code) == '0':
+        items = callback.get('CallbackMetadata', {}).get('Item', [])
+        metadata = {item.get('Name'): item.get('Value') for item in items if item.get('Name')}
+        phone_number = str(metadata.get('PhoneNumber', payment.payer_phone or '')) if metadata.get('PhoneNumber') else payment.payer_phone
+        payment.payer_phone = phone_number
+        payment.save(update_fields=['payer_phone'])
+        payment.mark_paid(
+            payment_method='M-Pesa',
+            transaction_code=str(metadata.get('MpesaReceiptNumber', payment.transaction_code or '')).strip(),
+        )
+        if payment.booking.status == 'Pending':
+            payment.booking.mark_confirmed()
+    else:
+        payment.mark_failed(payment_method='M-Pesa', gateway_response=json.dumps(payload))
+
+    return JsonResponse({'ResultCode': 0, 'ResultDesc': result_desc or 'Accepted'})
 
 
 def serialize_vehicle(vehicle):
@@ -730,7 +1170,14 @@ def api_my_bookings(request):
             'id': booking.id,
             'vehicle': serialize_vehicle(booking.vehicle),
             'pickup_location': booking.pickup_location,
+            'pickup_latitude': str(booking.pickup_latitude) if booking.pickup_latitude is not None else None,
+            'pickup_longitude': str(booking.pickup_longitude) if booking.pickup_longitude is not None else None,
             'dropoff_location': booking.dropoff_location,
+            'dropoff_latitude': str(booking.dropoff_latitude) if booking.dropoff_latitude is not None else None,
+            'dropoff_longitude': str(booking.dropoff_longitude) if booking.dropoff_longitude is not None else None,
+            'service_type': booking.service_type,
+            'service_label': booking.get_service_type_display(),
+            'service_fee': str(booking.service_fee),
             'start_date': booking.start_date.isoformat(),
             'end_date': booking.end_date.isoformat(),
             'total_amount': str(booking.total_amount),
@@ -739,6 +1186,18 @@ def api_my_bookings(request):
             'cancelled_at': booking.cancelled_at.isoformat() if booking.cancelled_at else None,
             'cancel_reason': booking.cancel_reason,
             'can_cancel': booking.can_cancel(),
+            'payment': {
+                'status': booking.payment.status,
+                'amount': str(booking.payment.amount),
+                'payment_method': booking.payment.payment_method,
+                'transaction_code': booking.payment.transaction_code,
+                'paid_at': booking.payment.paid_at.isoformat() if booking.payment.paid_at else None,
+            } if hasattr(booking, 'payment') else None,
+            'delivery': {
+                'delivery_location': booking.deliveryagreement.delivery_location,
+                'agreement_signed': booking.deliveryagreement.agreement_signed,
+                'delivery_date': booking.deliveryagreement.delivery_date.isoformat() if booking.deliveryagreement.delivery_date else None,
+            } if hasattr(booking, 'deliveryagreement') else None,
             'extras': [
                 {
                     'name': item.service.name,
