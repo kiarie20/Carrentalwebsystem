@@ -384,6 +384,8 @@ def home(request):
     hero_showcase_image = get_vehicle_showcase_image(hero_vehicle)
     cheapest_vehicle = Vehicle.objects.order_by('price_per_day').first()
     vehicle_types = Vehicle.objects.exclude(vehicle_type='').values_list('vehicle_type', flat=True).distinct()
+    transmission_types = Vehicle.objects.exclude(transmission='').values_list('transmission', flat=True).distinct()
+    fuel_types = Vehicle.objects.exclude(fuel_type='').values_list('fuel_type', flat=True).distinct()
     home_stats = [
         {'label': 'Vehicles Ready', 'value': Vehicle.objects.filter(status='Available').count()},
         {'label': 'Fleet Size', 'value': Vehicle.objects.count()},
@@ -396,6 +398,8 @@ def home(request):
         'featured_vehicles': featured,
         'benefits': BENEFITS,
         'vehicle_types': vehicle_types,
+        'transmission_types': transmission_types,
+        'fuel_types': fuel_types,
         'hero_features': build_vehicle_features(hero_vehicle)[:4] if hero_vehicle else [],
         'home_stats': home_stats,
     }

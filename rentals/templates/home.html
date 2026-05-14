@@ -74,24 +74,34 @@
             {% endfor %}
         </div>
 
-        <form class="search-card home-search-card" method="get" action="{% url 'car_list' %}#results">
+        <form class="search-card home-search-card home-search-strip" method="get" action="{% url 'car_list' %}#results">
             <div class="field-group">
                 <label for="home_vehicle_search">Search Car</label>
                 <input id="home_vehicle_search" name="q" type="text" placeholder="Search by car name, model, or type">
-            </div>
-            <div class="field-group">
-                <label for="start_date">Pick-up Date</label>
-                <input id="start_date" name="start_date" type="date">
-            </div>
-            <div class="field-group">
-                <label for="end_date">Drop-off Date</label>
-                <input id="end_date" name="end_date" type="date">
             </div>
             <div class="field-group">
                 <label for="vehicle_type">Vehicle Type</label>
                 <select id="vehicle_type" name="type">
                     <option value="">All Types</option>
                     {% for item in vehicle_types %}
+                        <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label for="home_transmission">Transmission</label>
+                <select id="home_transmission" name="transmission">
+                    <option value="">All</option>
+                    {% for item in transmission_types %}
+                        <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field-group">
+                <label for="home_fuel">Fuel Type</label>
+                <select id="home_fuel" name="fuel">
+                    <option value="">All</option>
+                    {% for item in fuel_types %}
                         <option value="{{ item }}">{{ item }}</option>
                     {% endfor %}
                 </select>

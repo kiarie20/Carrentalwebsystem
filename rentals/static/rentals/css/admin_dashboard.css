@@ -1572,3 +1572,76 @@ body {
 .topbar-date {
     color: var(--muted);
 }
+
+/* Final staff-side readability polish - 2026-05-15 */
+.dashboard-sidebar {
+    background:
+        radial-gradient(circle at top left, rgba(13, 140, 129, 0.18), transparent 18%),
+        linear-gradient(180deg, #061120 0%, #0a1627 100%);
+}
+
+.dashboard-nav a {
+    color: rgba(245, 249, 255, 0.88);
+}
+
+.dashboard-nav a:hover,
+.dashboard-nav a.is-active {
+    background: linear-gradient(135deg, #0d8c81 0%, #1f6ef5 100%);
+    color: #ffffff;
+}
+
+.dashboard-topbar h1,
+.dashboard-panel h2,
+.management-switch-label,
+.management-form-card strong,
+.subpanel-box h3 {
+    color: #0f172a;
+}
+
+.topbar-kicker,
+.dashboard-panel p,
+.panel-header p,
+.management-summary-panel p,
+.management-form-card small,
+.subpanel-box p,
+.dashboard-table td,
+.dashboard-table th,
+.ranking-copy small,
+.ranking-value small,
+.status-list-item strong,
+.metric-copy p,
+.metric-copy small {
+    color: #5f7086;
+}
+
+.dashboard-panel,
+.metric-card,
+.management-form-card,
+.subpanel-box,
+.management-switch-link {
+    box-shadow: 0 22px 54px rgba(10, 18, 30, 0.08);
+    border-color: rgba(110, 128, 152, 0.16);
+}
+
+.topbar-search input,
+.topbar-date,
+.management-form-card input,
+.management-form-card select,
+.management-form-card textarea {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(243, 247, 252, 0.96) 100%);
+    border-color: rgba(110, 128, 152, 0.2);
+    color: #132234;
+}
+
+.topbar-search input::placeholder,
+.management-form-card input::placeholder,
+.management-form-card textarea::placeholder {
+    color: rgba(95, 110, 132, 0.74);
+}
+
+.dashboard-role-badge,
+.panel-tag {
+    background: linear-gradient(135deg, rgba(8, 24, 40, 0.96) 0%, rgba(20, 49, 74, 0.94) 100%);
+    color: #f6dfaa;
+    border-color: rgba(216, 168, 74, 0.24);
+}
