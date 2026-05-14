@@ -1,0 +1,258 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RIRI Operations Hub</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
+</head>
+<body class="admin-dashboard-body">
+    <div class="dashboard-shell">
+        {% include 'includes/staff_sidebar.html' %}
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="topbar-kicker">RIRI Car Rentals</p>
+                    <h1>Operations Hub</h1>
+                    <div class="dashboard-role-badge">Staff Access</div>
+                </div>
+                <div class="topbar-tools">
+                    <div class="topbar-date">{{ today_label }}</div>
+                </div>
+            </header>
+
+            {% if messages %}
+                <section class="message-stack">
+                    {% for message in messages %}
+                        <div class="system-message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+
+            <section class="metric-grid compact-report-grid">
+                {% for card in operation_cards %}
+                    <article class="metric-card tone-{{ card.tone }}">
+                        <span class="metric-icon">{{ card.glyph }}</span>
+                        <div class="metric-copy">
+                            <p>{{ card.label }}</p>
+                            <h2>{{ card.value }}</h2>
+                            <small>{{ card.note }}</small>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+
+            <section class="dashboard-panel management-section">
+                <div class="panel-header">
+                    <div>
+                        <h2>Operational Flow</h2>
+                        <p>Follow the queue in order so every rental moves smoothly from payment to handover, return, and closure.</p>
+                    </div>
+                </div>
+                <div class="overview-tip-grid">
+                    <div class="subpanel-box">
+                        <h3>1. Ready For Handover</h3>
+                        <p>Start with paid confirmed bookings. Open the workflow, record handover details, and mark the rental as started.</p>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>2. Active Rentals</h3>
+                        <p>Monitor cars that are currently out with customers and move them to return inspection when they come back.</p>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>3. Returns Pending Closure</h3>
+                        <p>Complete return inspection, settle any extra charges, and only then close the booking.</p>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>4. Recently Completed</h3>
+                        <p>Review closed rentals to confirm the vehicle returned to the correct fleet state for the next trip.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-grid lower-grid operations-grid">
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Ready For Handover</h2>
+                            <p>Bookings that are paid and can now be released to customers.</p>
+                        </div>
+                    </div>
+
+                    {% if ready_for_handover %}
+                        <div class="table-wrap">
+                            <table class="dashboard-table operation-table">
+                                <thead>
+                                    <tr>
+                                        <th>Booking</th>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Trip Window</th>
+                                        <th>Service</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in ready_for_handover %}
+                                        <tr>
+                                            <td>#BK{{ booking.id }}</td>
+                                            <td>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</td>
+                                            <td>{{ booking.vehicle.name }}</td>
+                                            <td>{{ booking.start_date|date:"d M" }} - {{ booking.end_date|date:"d M" }}</td>
+                                            <td>{{ booking.get_service_type_display }}</td>
+                                            <td><a class="table-action-link" href="{% url 'admin_booking_workflow' booking.id %}">Open Workflow</a></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state">
+                            <h3>No handovers queued</h3>
+                            <p>As soon as a confirmed booking is paid, it will appear here for release and agreement sign-off.</p>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Active Rentals</h2>
+                            <p>Vehicles currently with customers and due back into the fleet workflow.</p>
+                        </div>
+                    </div>
+
+                    {% if active_rentals %}
+                        <div class="table-wrap">
+                            <table class="dashboard-table operation-table">
+                                <thead>
+                                    <tr>
+                                        <th>Booking</th>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Expected Return</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in active_rentals %}
+                                        <tr>
+                                            <td>#BK{{ booking.id }}</td>
+                                            <td>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</td>
+                                            <td>{{ booking.vehicle.name }}</td>
+                                            <td>{{ booking.end_date|date:"d M, Y" }}</td>
+                                            <td><span class="booking-pill status-rented">{{ booking.status }}</span></td>
+                                            <td><a class="table-action-link" href="{% url 'admin_booking_workflow' booking.id %}">Check In Return</a></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state">
+                            <h3>No active rentals</h3>
+                            <p>When a booking is handed over, it will appear here until the vehicle is checked back in.</p>
+                        </div>
+                    {% endif %}
+                </article>
+            </section>
+
+            <section class="dashboard-grid lower-grid operations-grid">
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Returns Pending Closure</h2>
+                            <p>Vehicles returned by customers but not yet settled or released back into the fleet.</p>
+                        </div>
+                    </div>
+
+                    {% if returns_pending %}
+                        <div class="table-wrap">
+                            <table class="dashboard-table operation-table">
+                                <thead>
+                                    <tr>
+                                        <th>Booking</th>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Checked In</th>
+                                        <th>Charges</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in returns_pending %}
+                                        <tr>
+                                            <td>#BK{{ booking.id }}</td>
+                                            <td>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</td>
+                                            <td>{{ booking.vehicle.name }}</td>
+                                            <td>{{ booking.returned_at|date:"d M, Y H:i" }}</td>
+                                            <td>
+                                                {% if booking.workflow_inspection and booking.workflow_inspection.requires_settlement %}
+                                                    KES {{ booking.workflow_inspection.total_extra_charges|floatformat:0|intcomma }}
+                                                {% else %}
+                                                    None
+                                                {% endif %}
+                                            </td>
+                                            <td><a class="table-action-link" href="{% url 'admin_booking_workflow' booking.id %}">Finalize Booking</a></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state">
+                            <h3>No returns waiting</h3>
+                            <p>Return inspections and settlement tasks will appear here before the booking is completed.</p>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Recently Completed</h2>
+                            <p>Latest rentals successfully closed and sent back into the fleet cycle.</p>
+                        </div>
+                    </div>
+
+                    {% if recently_completed %}
+                        <div class="table-wrap">
+                            <table class="dashboard-table operation-table">
+                                <thead>
+                                    <tr>
+                                        <th>Booking</th>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Completed</th>
+                                        <th>Vehicle Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in recently_completed %}
+                                        <tr>
+                                            <td>#BK{{ booking.id }}</td>
+                                            <td>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</td>
+                                            <td>{{ booking.vehicle.name }}</td>
+                                            <td>{{ booking.completed_at|date:"d M, Y H:i" }}</td>
+                                            <td><span class="booking-pill status-{{ booking.vehicle.status|lower }}">{{ booking.vehicle.status }}</span></td>
+                                            <td><a class="table-action-link" href="{% url 'admin_booking_workflow' booking.id %}">View Summary</a></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state">
+                            <h3>No completed returns yet</h3>
+                            <p>Completed rentals will show here once vehicles have been inspected, settled, and closed.</p>
+                        </div>
+                    {% endif %}
+                </article>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

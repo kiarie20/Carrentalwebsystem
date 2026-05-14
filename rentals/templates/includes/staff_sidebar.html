@@ -1,0 +1,32 @@
+<aside class="dashboard-sidebar">
+    <a class="dashboard-brand" href="{% url 'admin_dashboard' %}">
+        <span class="dashboard-brand-mark">R</span>
+        <span>
+            <strong>RIRI</strong>
+            <small>Admin Console</small>
+        </span>
+    </a>
+
+    {% with current_name=request.resolver_match.url_name %}
+    <nav class="dashboard-nav">
+        <a class="{% if current_name == 'admin_dashboard' %}is-active{% endif %}" href="{% url 'admin_dashboard' %}">Dashboard</a>
+        <a class="{% if current_name == 'admin_management' %}is-active{% endif %}" href="{% url 'admin_management' %}">Management</a>
+        <a class="{% if current_name == 'admin_operations' or current_name == 'admin_booking_workflow' %}is-active{% endif %}" href="{% url 'admin_operations' %}">Operations</a>
+        <a class="{% if current_name == 'admin_reports' %}is-active{% endif %}" href="{% url 'admin_reports' %}">Reports</a>
+    </nav>
+    {% endwith %}
+
+    <div class="sidebar-footer">
+        <div class="admin-user-card">
+            <span class="admin-avatar">{{ request.user.username|first|upper }}</span>
+            <div>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <small>{{ request.user.email|default:"Admin User" }}</small>
+            </div>
+        </div>
+        <div class="sidebar-actions">
+            <a href="{% url 'home' %}">Public Site</a>
+            <a href="{% url 'logout_user' %}">Logout</a>
+        </div>
+    </div>
+</aside>

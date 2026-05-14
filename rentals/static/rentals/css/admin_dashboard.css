@@ -117,14 +117,15 @@ button {
     min-height: 50px;
     padding: 0 16px;
     border-radius: 14px;
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 600;
+    color: rgba(247, 250, 255, 0.92);
+    font-weight: 700;
 }
 
 .dashboard-nav a:hover,
 .dashboard-nav a.is-active {
-    background: linear-gradient(135deg, #2b66f1 0%, #2254cf 100%);
+    background: linear-gradient(135deg, #0d8c81 0%, #0f6f77 58%, #1f8c84 100%);
     color: #fff;
+    box-shadow: 0 14px 30px rgba(6, 17, 29, 0.22);
 }
 
 .sidebar-footer {
@@ -169,7 +170,7 @@ button {
 }
 
 .sidebar-actions a {
-    color: rgba(255, 255, 255, 0.78);
+    color: rgba(247, 250, 255, 0.86);
     font-size: 0.96rem;
 }
 
@@ -187,7 +188,7 @@ button {
 
 .topbar-kicker {
     margin: 0 0 8px;
-    color: var(--muted);
+    color: #42526a;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -206,9 +207,9 @@ button {
     margin-top: 12px;
     padding: 0 12px;
     border-radius: 999px;
-    background: rgba(245, 158, 11, 0.14);
-    color: #9a6706;
-    border: 1px solid rgba(245, 158, 11, 0.2);
+    background: linear-gradient(135deg, rgba(10, 24, 40, 0.96) 0%, rgba(20, 43, 66, 0.94) 100%);
+    color: #f3d58b;
+    border: 1px solid rgba(211, 160, 75, 0.26);
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.03em;
@@ -232,7 +233,7 @@ button {
 
 .topbar-search input {
     width: 280px;
-    color: var(--muted);
+    color: var(--text);
 }
 
 .topbar-date {
@@ -900,4 +901,674 @@ body {
 
 .ranking-position {
     background: rgba(13, 140, 129, 0.1);
+}
+
+.status-rented {
+    background: rgba(13, 140, 129, 0.14);
+    color: var(--primary);
+}
+
+.status-booked {
+    background: rgba(41, 98, 242, 0.12);
+    color: #2254cf;
+}
+
+.status-returned {
+    background: rgba(124, 92, 255, 0.14);
+    color: var(--violet);
+}
+
+.status-available {
+    background: rgba(30, 154, 113, 0.12);
+    color: #0f7a56;
+}
+
+.status-maintenance {
+    background: rgba(227, 93, 93, 0.14);
+    color: var(--rose);
+}
+
+.message-stack {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 22px;
+}
+
+.system-message {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(93, 112, 140, 0.14);
+    background: rgba(255, 255, 255, 0.78);
+    font-weight: 600;
+}
+
+.message-success {
+    background: rgba(30, 154, 113, 0.12);
+    border-color: rgba(30, 154, 113, 0.18);
+    color: #0f7a56;
+}
+
+.message-error {
+    background: rgba(227, 93, 93, 0.12);
+    border-color: rgba(227, 93, 93, 0.2);
+    color: #b63e3e;
+}
+
+.message-warning {
+    background: rgba(211, 160, 75, 0.14);
+    border-color: rgba(211, 160, 75, 0.2);
+    color: #8f6400;
+}
+
+.topbar-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 16px;
+}
+
+.operations-grid,
+.workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.operation-table td:last-child,
+.operation-table th:last-child {
+    text-align: right;
+}
+
+.table-action-link {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.table-action-link:hover {
+    text-decoration: underline;
+}
+
+.workflow-hero-panel {
+    margin-bottom: 22px;
+}
+
+.workflow-progress {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.workflow-step {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(220, 229, 240, 0.86);
+    background: rgba(248, 250, 252, 0.9);
+}
+
+.workflow-step-number {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(93, 112, 140, 0.1);
+    color: var(--muted);
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.workflow-step strong,
+.workflow-step small {
+    display: block;
+}
+
+.workflow-step small {
+    margin-top: 6px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.workflow-step.is-active {
+    border-color: rgba(13, 140, 129, 0.25);
+    background: rgba(13, 140, 129, 0.08);
+}
+
+.workflow-step.is-active .workflow-step-number {
+    background: rgba(13, 140, 129, 0.18);
+    color: var(--primary);
+}
+
+.workflow-step.is-complete {
+    border-color: rgba(30, 154, 113, 0.22);
+    background: rgba(30, 154, 113, 0.08);
+}
+
+.workflow-step.is-complete .workflow-step-number {
+    background: rgba(30, 154, 113, 0.18);
+    color: #0f7a56;
+}
+
+.detail-list {
+    display: grid;
+    gap: 12px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(220, 229, 240, 0.78);
+}
+
+.detail-row span {
+    color: var(--muted);
+}
+
+.detail-row strong {
+    text-align: right;
+}
+
+.detail-row.total-row {
+    padding-top: 6px;
+}
+
+.detail-row.total-row span,
+.detail-row.total-row strong {
+    color: var(--text);
+}
+
+.subpanel-box {
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(248, 250, 252, 0.84);
+    border: 1px solid rgba(220, 229, 240, 0.76);
+}
+
+.subpanel-box h3 {
+    margin: 0 0 14px;
+}
+
+.subpanel-copy {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.data-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(13, 140, 129, 0.08);
+    border: 1px solid rgba(13, 140, 129, 0.12);
+    color: var(--primary);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.admin-form-stack {
+    display: grid;
+    gap: 18px;
+}
+
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.admin-field {
+    display: grid;
+    gap: 8px;
+}
+
+.admin-field.span-2 {
+    grid-column: 1 / -1;
+}
+
+.admin-field label {
+    font-weight: 700;
+}
+
+.admin-field input,
+.admin-field select,
+.admin-field textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(220, 229, 240, 0.95);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text);
+}
+
+.admin-field textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.checkbox-field {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(220, 229, 240, 0.8);
+    background: rgba(248, 250, 252, 0.72);
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+}
+
+.checkbox-label input {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+}
+
+.field-error {
+    color: #b63e3e;
+    font-weight: 600;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.primary-button {
+    background: linear-gradient(135deg, #0d8c81 0%, #0a6e65 100%);
+    color: #fff;
+}
+
+.success-button {
+    background: linear-gradient(135deg, #1e9a71 0%, #0f7a56 100%);
+    color: #fff;
+}
+
+.form-note {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 560px;
+}
+
+.settlement-banner {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border-radius: 16px;
+    background: rgba(211, 160, 75, 0.12);
+    border: 1px solid rgba(211, 160, 75, 0.18);
+}
+
+.settlement-banner strong {
+    font-size: 1rem;
+}
+
+.settlement-banner span {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.settlement-banner small {
+    color: var(--muted);
+}
+
+.compact-empty-state {
+    padding-top: 6px;
+}
+
+.management-card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.management-card {
+    display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.management-card:hover,
+.management-card.is-active {
+    transform: translateY(-2px);
+    border-color: rgba(41, 98, 242, 0.24);
+    box-shadow: 0 28px 56px rgba(15, 23, 42, 0.12);
+}
+
+.management-summary-panel {
+    margin-bottom: 22px;
+}
+
+.management-switcher-panel {
+    margin-bottom: 22px;
+}
+
+.management-section-switcher {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+}
+
+.management-switch-link {
+    display: grid;
+    gap: 6px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(220, 229, 240, 0.9);
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 246, 251, 0.92) 100%);
+    color: var(--text);
+    box-shadow: 0 16px 28px rgba(7, 16, 30, 0.05);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.management-switch-link:hover,
+.management-switch-link.is-active {
+    transform: translateY(-2px);
+    border-color: rgba(13, 140, 129, 0.22);
+    box-shadow: 0 20px 36px rgba(7, 16, 30, 0.09);
+}
+
+.management-switch-link.is-active {
+    background: linear-gradient(135deg, rgba(13, 140, 129, 0.14) 0%, rgba(211, 160, 75, 0.12) 100%);
+}
+
+.management-switch-label {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.management-switch-link strong {
+    color: var(--text);
+    font-size: 1.2rem;
+}
+
+.management-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.management-create-card {
+    margin-bottom: 18px;
+}
+
+.management-form-card {
+    display: grid;
+    gap: 16px;
+}
+
+.management-card-head,
+.management-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.management-card-head strong,
+.management-card-head small,
+.management-card-footer small {
+    display: block;
+}
+
+.management-card-head small,
+.management-card-footer small {
+    color: var(--muted);
+}
+
+.management-action-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.booking-status-stack {
+    display: grid;
+    gap: 8px;
+    justify-items: end;
+}
+
+.compact-admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compact-admin-grid .span-2 {
+    grid-column: 1 / -1;
+}
+
+.management-section {
+    margin-bottom: 22px;
+}
+
+.management-section:last-child {
+    margin-bottom: 0;
+}
+
+.create-vehicle-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.overview-tip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.danger-button {
+    border-color: rgba(239, 68, 68, 0.24);
+    color: #b42318;
+}
+
+.danger-button:hover {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.file-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+}
+
+.muted-chip {
+    background: rgba(100, 116, 139, 0.12);
+    color: var(--muted);
+}
+
+.management-form-card input:disabled,
+.management-form-card select:disabled,
+.management-form-card textarea:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+}
+
+/* Staff-side readability polish */
+.dashboard-panel h2,
+.dashboard-panel h3,
+.dashboard-panel strong,
+.metric-card h2,
+.metric-card strong,
+.admin-field label,
+.dashboard-table th,
+.dashboard-table td {
+    color: var(--text);
+}
+
+.panel-header p,
+.metric-copy p,
+.metric-copy small,
+.admin-field small,
+.management-card-head small,
+.management-card-footer small,
+.subpanel-copy,
+.detail-row span,
+.workflow-step small,
+.topbar-date,
+.topbar-search input::placeholder {
+    color: var(--muted);
+}
+
+.admin-field input::placeholder,
+.admin-field textarea::placeholder {
+    color: rgba(100, 116, 139, 0.74);
+}
+
+@media (max-width: 1320px) {
+    .management-card-grid,
+    .workflow-progress,
+    .create-vehicle-grid,
+    .overview-tip-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1120px) {
+    .operations-grid,
+    .workflow-grid,
+    .management-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .create-vehicle-grid,
+    .overview-tip-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .workflow-progress,
+    .admin-form-grid,
+    .compact-admin-grid,
+    .create-vehicle-grid,
+    .overview-tip-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-row,
+    .form-actions,
+    .management-card-head,
+    .management-card-footer,
+    .management-action-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .detail-row strong,
+    .operation-table td:last-child,
+    .operation-table th:last-child {
+        text-align: left;
+    }
+}
+
+/* Final presentation polish - 2026-05-14 */
+:root {
+    --bg: #eff2f7;
+    --surface: rgba(255, 255, 255, 0.95);
+    --surface-soft: rgba(248, 243, 236, 0.9);
+    --line: rgba(129, 94, 84, 0.14);
+    --text: #131a28;
+    --muted: #5d6578;
+    --nav: #08111d;
+    --nav-soft: #111d2d;
+    --primary: #c52d2f;
+    --primary-soft: rgba(197, 45, 47, 0.14);
+    --green: #178f60;
+    --green-soft: rgba(23, 143, 96, 0.14);
+    --violet: #7e54d6;
+    --violet-soft: rgba(126, 84, 214, 0.14);
+    --gold: #efb15c;
+    --gold-soft: rgba(239, 177, 92, 0.16);
+    --rose: #d44a52;
+    --rose-soft: rgba(212, 74, 82, 0.14);
+    --shadow: 0 24px 56px rgba(10, 16, 28, 0.1);
+}
+
+body {
+    font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background:
+        radial-gradient(circle at top left, rgba(197, 45, 47, 0.08), transparent 20%),
+        radial-gradient(circle at top right, rgba(239, 177, 92, 0.12), transparent 22%),
+        linear-gradient(180deg, #fbfcfe 0%, #eff2f7 100%);
+}
+
+.dashboard-sidebar {
+    background:
+        radial-gradient(circle at top left, rgba(197, 45, 47, 0.18), transparent 20%),
+        radial-gradient(circle at bottom right, rgba(239, 177, 92, 0.14), transparent 24%),
+        linear-gradient(180deg, #06101c 0%, #0c1626 52%, #142235 100%);
+}
+
+.dashboard-brand-mark {
+    background: linear-gradient(140deg, #6d1423 0%, #c52d2f 56%, #efb15c 140%);
+}
+
+.dashboard-nav a {
+    color: rgba(255, 247, 239, 0.9);
+}
+
+.dashboard-nav a:hover,
+.dashboard-nav a.is-active {
+    background: linear-gradient(135deg, #7f1824 0%, #c52d2f 60%, #efb15c 160%);
+    color: #fff8ef;
+}
+
+.dashboard-role-badge {
+    background: linear-gradient(135deg, rgba(127, 24, 36, 0.14) 0%, rgba(239, 177, 92, 0.14) 100%);
+    color: #9a6222;
+    border-color: rgba(239, 177, 92, 0.24);
+}
+
+.metric-card,
+.dashboard-panel,
+.subpanel-box,
+.management-form-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 243, 236, 0.94) 100%);
+    border-color: rgba(175, 132, 110, 0.14);
+}
+
+.management-switch-link:hover,
+.management-switch-link.is-active {
+    background: linear-gradient(135deg, rgba(197, 45, 47, 0.1) 0%, rgba(239, 177, 92, 0.14) 100%);
+    border-color: rgba(197, 45, 47, 0.18);
+}
+
+.management-switch-link.is-active strong,
+.management-switch-label,
+.panel-header h2,
+.dashboard-topbar h1 {
+    color: var(--text);
+}
+
+.topbar-kicker,
+.panel-header p,
+.management-card-footer small,
+.subpanel-copy,
+.detail-row span,
+.workflow-step small,
+.topbar-date {
+    color: var(--muted);
 }

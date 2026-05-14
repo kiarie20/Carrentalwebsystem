@@ -1,0 +1,711 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RIRI Staff Management</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
+</head>
+<body class="admin-dashboard-body">
+    <div class="dashboard-shell">
+        {% include 'includes/staff_sidebar.html' %}
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="topbar-kicker">RIRI Car Rentals</p>
+                    <h1>Staff Management Hub</h1>
+                    <div class="dashboard-role-badge">Staff Access</div>
+                </div>
+                <div class="topbar-tools">
+                    <form class="topbar-search" action="{% url 'admin_management' %}" method="get">
+                        <input type="hidden" name="section" value="{{ management_section }}">
+                        <input type="text" name="q" value="{{ management_query }}" placeholder="Search vehicles, bookings, customers, payments..." aria-label="Search management records">
+                    </form>
+                    <div class="topbar-date">{{ today_label }}</div>
+                </div>
+            </header>
+
+            <section class="dashboard-panel management-switcher-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Management Areas</h2>
+                        <p>Choose the exact section you want to manage. The sidebar now keeps only the main staff pages, while these tabs control the Management workspace itself.</p>
+                    </div>
+                </div>
+                <div class="management-section-switcher">
+                    {% for card in section_cards %}
+                        <a class="management-switch-link {% if management_section == card.code %}is-active{% endif %}" href="{% url 'admin_management' %}?section={{ card.code }}{% if management_query %}&q={{ management_query|urlencode }}{% endif %}">
+                            <span class="management-switch-label">{{ card.label }}</span>
+                            <strong>{{ card.value }}</strong>
+                        </a>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% if messages %}
+                <section class="message-stack">
+                    {% for message in messages %}
+                        <div class="system-message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+
+            {% if management_query %}
+                <section class="dashboard-panel management-summary-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Search Summary</h2>
+                            <p>Showing filtered records for "{{ management_query }}".</p>
+                        </div>
+                        <span class="panel-tag">{{ query_result_total|intcomma }} total matches across visible sections</span>
+                    </div>
+                </section>
+            {% endif %}
+
+            {% if management_section == 'overview' %}
+            <section class="dashboard-panel management-section">
+                <div class="panel-header">
+                    <div>
+                        <h2>Choose a Work Area</h2>
+                        <p>Use the cards above to jump into fleet, bookings, customers, payments, documents, services, or user access. Each section now opens on its own so the staff workflow stays cleaner and easier to manage.</p>
+                    </div>
+                </div>
+                <div class="management-grid overview-tip-grid">
+                    <div class="subpanel-box">
+                        <h3>Fleet Work</h3>
+                        <p>Add vehicles, tune pricing, feature cars on the public site, or remove unused fleet records.</p>
+                        <a class="table-action-link" href="{% url 'admin_management' %}?section=vehicles">Open Fleet Section</a>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>Verification Work</h3>
+                        <p>Open uploaded customer documents, write review notes, and approve or reject verification in one place.</p>
+                        <a class="table-action-link" href="{% url 'admin_management' %}?section=documents">Open Documents Section</a>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>Money Flow</h3>
+                        <p>Track payment references, update statuses, and move confirmed bookings forward for operations.</p>
+                        <a class="table-action-link" href="{% url 'admin_management' %}?section=payments">Open Payments Section</a>
+                    </div>
+                    <div class="subpanel-box">
+                        <h3>Operational Follow-through</h3>
+                        <p>Use the Operations hub for handover, return inspection, settlement, and final closure after payment.</p>
+                        <a class="table-action-link" href="{% url 'admin_operations' %}">Open Operations Hub</a>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if management_section == 'vehicles' %}
+            <section class="dashboard-panel management-section" id="vehicles">
+                <div class="panel-header">
+                    <div>
+                        <h2>Fleet & Pricing</h2>
+                        <p>Update vehicle pricing, availability, and featured status without leaving the staff hub.</p>
+                    </div>
+                </div>
+                <form method="post" class="subpanel-box management-form-card management-create-card">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="vehicle_create">
+                    <input type="hidden" name="section" value="vehicles">
+                    <input type="hidden" name="q" value="{{ management_query }}">
+                    <div class="management-card-head">
+                        <div>
+                            <strong>Add a Vehicle</strong>
+                            <small>Create fleet records without leaving the staff dashboard.</small>
+                        </div>
+                    </div>
+                    <div class="admin-form-grid compact-admin-grid create-vehicle-grid">
+                        <div class="admin-field">
+                            <label>Name</label>
+                            <input type="text" name="name" placeholder="Toyota Prado">
+                        </div>
+                        <div class="admin-field">
+                            <label>Model</label>
+                            <input type="text" name="model" placeholder="TXL">
+                        </div>
+                        <div class="admin-field">
+                            <label>Plate Number</label>
+                            <input type="text" name="plate_number" placeholder="KDG 123A">
+                        </div>
+                        <div class="admin-field">
+                            <label>Daily Rate</label>
+                            <input type="number" name="price_per_day" min="0" step="0.01" placeholder="12000">
+                        </div>
+                        <div class="admin-field">
+                            <label>Vehicle Type</label>
+                            <select name="vehicle_type">
+                                {% for value, label in vehicle_type_options %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="admin-field">
+                            <label>Transmission</label>
+                            <select name="transmission">
+                                {% for value, label in transmission_options %}
+                                    <option value="{{ value }}" {% if value == 'Automatic' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="admin-field">
+                            <label>Fuel Type</label>
+                            <select name="fuel_type">
+                                {% for value, label in fuel_type_options %}
+                                    <option value="{{ value }}" {% if value == 'Petrol' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="admin-field">
+                            <label>Status</label>
+                            <select name="status">
+                                {% for value, label in vehicle_status_choices %}
+                                    <option value="{{ value }}" {% if value == 'Available' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="admin-field">
+                            <label>Next Available Date</label>
+                            <input type="date" name="next_available_date">
+                        </div>
+                        <div class="admin-field">
+                            <label>Year</label>
+                            <input type="number" name="year" min="1990" max="2099" placeholder="2024">
+                        </div>
+                        <div class="admin-field">
+                            <label>Mileage</label>
+                            <input type="number" name="mileage" min="0" step="1" placeholder="12000">
+                        </div>
+                        <div class="admin-field">
+                            <label>Pick-up Area</label>
+                            <input type="text" name="pickup_location" value="Nairobi, Kenya">
+                        </div>
+                        <div class="admin-field">
+                            <label>Drop-off Area</label>
+                            <input type="text" name="dropoff_location" value="Nairobi, Kenya">
+                        </div>
+                        <div class="admin-field span-2">
+                            <label>Image URL</label>
+                            <input type="url" name="image_url" placeholder="https://...">
+                        </div>
+                    </div>
+                    <div class="management-card-footer">
+                        <small>Use a real image URL now, then add local uploads later if you want tighter control.</small>
+                        <button class="primary-button" type="submit">Add Vehicle</button>
+                    </div>
+                </form>
+                <div class="management-grid">
+                    {% for vehicle in vehicles %}
+                        <form method="post" class="subpanel-box management-form-card">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+                            <input type="hidden" name="section" value="vehicles">
+                            <input type="hidden" name="q" value="{{ management_query }}">
+                            <div class="management-card-head">
+                                <div>
+                                    <strong>{{ vehicle.name }}</strong>
+                                    <small>{{ vehicle.plate_number }} . {{ vehicle.vehicle_type|default:"Vehicle" }}</small>
+                                </div>
+                                <span class="booking-pill status-{{ vehicle.status|lower }}">{{ vehicle.status }}</span>
+                            </div>
+                            <div class="admin-form-grid compact-admin-grid">
+                                <div class="admin-field">
+                                    <label>Name</label>
+                                    <input type="text" name="name" value="{{ vehicle.name }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Model</label>
+                                    <input type="text" name="model" value="{{ vehicle.model }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Plate Number</label>
+                                    <input type="text" name="plate_number" value="{{ vehicle.plate_number }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Daily Rate</label>
+                                    <input type="number" name="price_per_day" min="0" step="0.01" value="{{ vehicle.price_per_day }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Vehicle Type</label>
+                                    <select name="vehicle_type">
+                                        {% for value, label in vehicle_type_options %}
+                                            <option value="{{ value }}" {% if vehicle.vehicle_type == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Transmission</label>
+                                    <select name="transmission">
+                                        {% for value, label in transmission_options %}
+                                            <option value="{{ value }}" {% if vehicle.transmission == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Fuel Type</label>
+                                    <select name="fuel_type">
+                                        {% for value, label in fuel_type_options %}
+                                            <option value="{{ value }}" {% if vehicle.fuel_type == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Status</label>
+                                    <select name="status">
+                                        {% for value, label in vehicle_status_choices %}
+                                            <option value="{{ value }}" {% if vehicle.status == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Next Available Date</label>
+                                    <input type="date" name="next_available_date" value="{% if vehicle.next_available_date %}{{ vehicle.next_available_date|date:'Y-m-d' }}{% endif %}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Pick-up Area</label>
+                                    <input type="text" name="pickup_location" value="{{ vehicle.pickup_location }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Drop-off Area</label>
+                                    <input type="text" name="dropoff_location" value="{{ vehicle.dropoff_location }}">
+                                </div>
+                                <div class="admin-field span-2">
+                                    <label>Image URL</label>
+                                    <input type="url" name="image_url" value="{{ vehicle.image_url }}">
+                                </div>
+                                <div class="admin-field checkbox-field span-2">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="is_featured" {% if vehicle.is_featured %}checked{% endif %}>
+                                        <span>Show as featured on the public site</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="management-card-footer">
+                                <small>Current next available date: {{ vehicle.next_available_date|default:"Now" }}</small>
+                                <div class="management-action-group">
+                                    <button class="primary-button" type="submit" name="action" value="vehicle_save">Save Vehicle</button>
+                                    <button class="ghost-button danger-button" type="submit" name="action" value="vehicle_delete">Remove Vehicle</button>
+                                </div>
+                            </div>
+                        </form>
+                    {% empty %}
+                        <div class="empty-panel-state">
+                            <h3>No vehicles found</h3>
+                            <p>Try a broader search or add more fleet records.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if management_section == 'bookings' %}
+            <section class="dashboard-panel management-section" id="bookings">
+                <div class="panel-header">
+                    <div>
+                        <h2>Bookings & Workflows</h2>
+                        <p>Update reservation details here, then move into the workflow page for handover, return, and closure when the trip goes live.</p>
+                    </div>
+                </div>
+                <div class="management-grid">
+                    {% for booking in bookings %}
+                        <form method="post" class="subpanel-box management-form-card">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="booking_update">
+                            <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                            <input type="hidden" name="section" value="bookings">
+                            <input type="hidden" name="q" value="{{ management_query }}">
+                            <div class="management-card-head">
+                                <div>
+                                    <strong>#BK{{ booking.id }} . {{ booking.vehicle.name }}</strong>
+                                    <small>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }} . {{ booking.get_service_type_display }}</small>
+                                </div>
+                                <div class="booking-status-stack">
+                                    <span class="booking-pill status-{{ booking.status|lower }}">{{ booking.status }}</span>
+                                    {% if booking.payment %}
+                                        <span class="booking-pill status-{{ booking.payment.status|lower }}">{{ booking.payment.status }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="admin-form-grid compact-admin-grid">
+                                <div class="admin-field">
+                                    <label>Pick-up Location</label>
+                                    <input type="text" name="pickup_location" value="{{ booking.pickup_location }}" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Drop-off Location</label>
+                                    <input type="text" name="dropoff_location" value="{{ booking.dropoff_location }}" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Start Date</label>
+                                    <input type="date" name="start_date" value="{{ booking.start_date|date:'Y-m-d' }}" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                </div>
+                                <div class="admin-field">
+                                    <label>End Date</label>
+                                    <input type="date" name="end_date" value="{{ booking.end_date|date:'Y-m-d' }}" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Service Type</label>
+                                    <select name="service_type" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                        {% for value, label in service_type_choices %}
+                                            <option value="{{ value }}" {% if booking.service_type == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field">
+                                    <label>Status</label>
+                                    <select name="status" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                        {% for value, label in booking_status_choices %}
+                                            <option value="{{ value }}" {% if booking.status == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="admin-field span-2">
+                                    <label>Staff Note (used mainly when cancelling)</label>
+                                    <input type="text" name="status_note" value="{{ booking.cancel_reason }}" placeholder="Optional note for cancellation or schedule changes" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>
+                                </div>
+                            </div>
+                            <div class="management-card-footer">
+                                <small>
+                                    Total: KES {{ booking.total_amount|floatformat:0|intcomma }}{% if booking.payment %} . Payment {{ booking.payment.status }}{% endif %}
+                                    {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}
+                                        . Use the workflow page for active rental stages.
+                                    {% endif %}
+                                </small>
+                                <div class="management-action-group">
+                                    <a class="ghost-button" href="{% url 'admin_booking_workflow' booking.id %}">Open Workflow</a>
+                                    <button class="primary-button" type="submit" {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}disabled{% endif %}>Save Booking</button>
+                                </div>
+                            </div>
+                        </form>
+                    {% empty %}
+                        <div class="empty-panel-state">
+                            <h3>No bookings found</h3>
+                            <p>Reservations will show up here once customers start booking.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if management_section == 'payments' or management_section == 'documents' %}
+            <section class="dashboard-grid lower-grid">
+                {% if management_section == 'payments' %}
+                <article class="dashboard-panel management-section" id="payments">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Payments</h2>
+                            <p>Review references and manually confirm or fail payment records when needed.</p>
+                        </div>
+                    </div>
+                    <div class="management-grid">
+                        {% for payment in payments %}
+                            <form method="post" class="subpanel-box management-form-card">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="payment_update">
+                                <input type="hidden" name="payment_id" value="{{ payment.id }}">
+                                <input type="hidden" name="section" value="payments">
+                                <input type="hidden" name="q" value="{{ management_query }}">
+                                <div class="management-card-head">
+                                    <div>
+                                        <strong>#PY{{ payment.id }} . {{ payment.booking.vehicle.name }}</strong>
+                                        <small>{{ payment.booking.customer.user.username }}</small>
+                                    </div>
+                                    <span class="booking-pill status-{{ payment.status|lower }}">{{ payment.status }}</span>
+                                </div>
+                                <div class="admin-form-grid compact-admin-grid">
+                                    <div class="admin-field">
+                                        <label>Method</label>
+                                        <select name="payment_method">
+                                            {% for value, label in payment_method_choices %}
+                                                <option value="{{ value }}" {% if payment.payment_method == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Status</label>
+                                        <select name="status">
+                                            {% for value, label in payment_status_choices %}
+                                                <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Payer Phone</label>
+                                        <input type="text" name="payer_phone" value="{{ payment.payer_phone }}">
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Reference</label>
+                                        <input type="text" name="transaction_code" value="{{ payment.transaction_code }}">
+                                    </div>
+                                </div>
+                                <div class="management-card-footer">
+                                    <small>Amount: KES {{ payment.amount|floatformat:0|intcomma }}</small>
+                                    <button class="primary-button" type="submit">Update Payment</button>
+                                </div>
+                            </form>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No payments found</h3>
+                                <p>Payments will appear here once customers start booking.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endif %}
+
+                {% if management_section == 'documents' %}
+                <article class="dashboard-panel management-section" id="documents">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Document Verification</h2>
+                            <p>Approve, reject, and comment on customer verification directly from the staff hub.</p>
+                        </div>
+                    </div>
+                    <div class="management-grid">
+                        {% for document in documents %}
+                            <form method="post" class="subpanel-box management-form-card">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="document_review">
+                                <input type="hidden" name="document_id" value="{{ document.id }}">
+                                <input type="hidden" name="section" value="documents">
+                                <input type="hidden" name="q" value="{{ management_query }}">
+                                <div class="management-card-head">
+                                    <div>
+                                        <strong>{{ document.customer.user.get_full_name|default:document.customer.user.username }}</strong>
+                                        <small>Uploaded {{ document.uploaded_at|date:"d M Y H:i" }}</small>
+                                    </div>
+                                    <span class="booking-pill status-{{ document.verification_status|lower }}">{{ document.verification_status }}</span>
+                                </div>
+                                <div class="admin-form-grid compact-admin-grid">
+                                    <div class="admin-field">
+                                        <label>Status</label>
+                                        <select name="verification_status">
+                                        {% for value, label in document_status_choices %}
+                                                <option value="{{ value }}" {% if document.verification_status == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>National ID</label>
+                                        {% if document.national_id_file %}
+                                            <a class="table-action-link file-link" href="{{ document.national_id_file.url }}" target="_blank" rel="noopener">Open National ID</a>
+                                        {% else %}
+                                            <span class="data-chip muted-chip">No file</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Driver License</label>
+                                        {% if document.driver_license_file %}
+                                            <a class="table-action-link file-link" href="{{ document.driver_license_file.url }}" target="_blank" rel="noopener">Open License</a>
+                                        {% else %}
+                                            <span class="data-chip muted-chip">No file</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="admin-field span-2">
+                                        <label>Review Notes</label>
+                                        <textarea name="review_notes" rows="3">{{ document.review_notes }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="management-card-footer">
+                                    <small>{% if document.reviewed_by %}Last reviewed by {{ document.reviewed_by.username }}{% else %}Awaiting staff review{% endif %}</small>
+                                    <button class="primary-button" type="submit">Save Review</button>
+                                </div>
+                            </form>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No document records found</h3>
+                                <p>Document verification requests will show here.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {% if management_section == 'services' or management_section == 'users' %}
+            <section class="dashboard-grid lower-grid">
+                {% if management_section == 'services' %}
+                <article class="dashboard-panel management-section" id="services">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Extra Services</h2>
+                            <p>Keep service pricing and availability aligned with the rental flow.</p>
+                        </div>
+                    </div>
+                    <div class="management-grid">
+                        {% for service in services %}
+                            <form method="post" class="subpanel-box management-form-card">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="service_update">
+                                <input type="hidden" name="service_id" value="{{ service.id }}">
+                                <input type="hidden" name="section" value="services">
+                                <input type="hidden" name="q" value="{{ management_query }}">
+                                <div class="management-card-head">
+                                    <div>
+                                        <strong>{{ service.name }}</strong>
+                                        <small>{{ service.code }}</small>
+                                    </div>
+                                    <span class="booking-pill {% if service.is_active %}status-completed{% else %}status-cancelled{% endif %}">
+                                        {% if service.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </div>
+                                <div class="admin-form-grid compact-admin-grid">
+                                    <div class="admin-field">
+                                        <label>Price</label>
+                                        <input type="number" name="price" min="0" step="0.01" value="{{ service.price }}">
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Pricing Mode</label>
+                                        <select name="pricing_mode">
+                                            {% for value, label in pricing_mode_choices %}
+                                                <option value="{{ value }}" {% if service.pricing_mode == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="admin-field">
+                                        <label>Display Order</label>
+                                        <input type="number" name="display_order" min="0" step="1" value="{{ service.display_order }}">
+                                    </div>
+                                    <div class="admin-field checkbox-field">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" name="is_active" {% if service.is_active %}checked{% endif %}>
+                                            <span>Enabled for customers</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="management-card-footer">
+                                    <small>{{ service.description|truncatechars:96 }}</small>
+                                    <button class="primary-button" type="submit">Save Service</button>
+                                </div>
+                            </form>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No services found</h3>
+                                <p>Add or seed services to manage them here.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endif %}
+
+                {% if management_section == 'users' %}
+                <article class="dashboard-panel management-section" id="users">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Users & Access</h2>
+                            <p>Review customer/staff access and keep the right people inside the right workflow.</p>
+                        </div>
+                    </div>
+                    <div class="management-grid">
+                        {% for managed_user in users %}
+                            <form method="post" class="subpanel-box management-form-card">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="user_update">
+                                <input type="hidden" name="user_id" value="{{ managed_user.id }}">
+                                <input type="hidden" name="section" value="users">
+                                <input type="hidden" name="q" value="{{ management_query }}">
+                                <div class="management-card-head">
+                                    <div>
+                                        <strong>{{ managed_user.get_full_name|default:managed_user.username }}</strong>
+                                        <small>{{ managed_user.email|default:managed_user.username }}</small>
+                                    </div>
+                                    <span class="booking-pill {% if managed_user.is_staff %}status-confirmed{% else %}status-pending{% endif %}">
+                                        {% if managed_user.is_staff %}Staff{% else %}Customer{% endif %}
+                                    </span>
+                                </div>
+                                <div class="admin-form-grid compact-admin-grid">
+                                    <div class="admin-field checkbox-field">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" name="is_staff" {% if managed_user.is_staff %}checked{% endif %}>
+                                            <span>Grant staff dashboard access</span>
+                                        </label>
+                                    </div>
+                                    <div class="admin-field checkbox-field">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" name="is_active" {% if managed_user.is_active %}checked{% endif %}>
+                                            <span>Account is active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="management-card-footer">
+                                    <small>Joined {{ managed_user.date_joined|date:"d M Y" }}</small>
+                                    <button class="primary-button" type="submit">Save Access</button>
+                                </div>
+                            </form>
+                        {% empty %}
+                            <div class="empty-panel-state">
+                                <h3>No users found</h3>
+                                <p>Customer and staff accounts will appear here.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {% if management_section == 'customers' %}
+            <section class="dashboard-panel management-section" id="customers">
+                <div class="panel-header">
+                    <div>
+                        <h2>Customers</h2>
+                        <p>Edit customer identity and contact details here without leaving the staff hub.</p>
+                    </div>
+                </div>
+                <div class="management-grid">
+                    {% for customer in customers %}
+                        <form method="post" class="subpanel-box management-form-card">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="customer_update">
+                            <input type="hidden" name="customer_id" value="{{ customer.id }}">
+                            <input type="hidden" name="section" value="customers">
+                            <input type="hidden" name="q" value="{{ management_query }}">
+                            <div class="management-card-head">
+                                <div>
+                                    <strong>{{ customer.user.get_full_name|default:customer.user.username }}</strong>
+                                    <small>{{ customer.user.email|default:customer.user.username }}</small>
+                                </div>
+                                <span class="booking-pill status-confirmed">Customer</span>
+                            </div>
+                            <div class="admin-form-grid compact-admin-grid">
+                                <div class="admin-field">
+                                    <label>Full Name</label>
+                                    <input type="text" name="full_name" value="{{ customer.user.get_full_name|default:customer.user.username }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Email</label>
+                                    <input type="email" name="email" value="{{ customer.user.email|default:customer.user.username }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>Phone</label>
+                                    <input type="text" name="phone" value="{{ customer.phone|default:'' }}">
+                                </div>
+                                <div class="admin-field">
+                                    <label>National ID</label>
+                                    <input type="text" name="national_id_number" value="{{ customer.national_id_number|default:'' }}">
+                                </div>
+                                <div class="admin-field span-2">
+                                    <label>Address</label>
+                                    <input type="text" name="address" value="{{ customer.address|default:'' }}">
+                                </div>
+                            </div>
+                            <div class="management-card-footer">
+                                <small>Account username: {{ customer.user.username }}</small>
+                                <button class="primary-button" type="submit">Save Customer</button>
+                            </div>
+                        </form>
+                    {% empty %}
+                        <div class="empty-panel-state">
+                            <h3>No customers found</h3>
+                            <p>Customer records will show up here once accounts are created.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

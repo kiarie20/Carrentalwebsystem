@@ -5,46 +5,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RIRI Admin Dashboard</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260513-1">
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
 </head>
 <body class="admin-dashboard-body">
     <div class="dashboard-shell">
-        <aside class="dashboard-sidebar">
-            <a class="dashboard-brand" href="{% url 'admin_dashboard' %}">
-                <span class="dashboard-brand-mark">R</span>
-                <span>
-                    <strong>RIRI</strong>
-                    <small>Admin Console</small>
-                </span>
-            </a>
-
-            <nav class="dashboard-nav">
-                <a class="is-active" href="{% url 'admin_dashboard' %}">Dashboard</a>
-                <a href="{% url 'admin_reports' %}">Reports</a>
-                <a href="{% url 'admin:rentals_vehicle_changelist' %}">Cars</a>
-                <a href="{% url 'admin:rentals_booking_changelist' %}">Bookings</a>
-                <a href="{% url 'admin:rentals_customer_changelist' %}">Customers</a>
-                <a href="{% url 'admin:rentals_payment_changelist' %}">Payments</a>
-                <a href="{% url 'admin:rentals_document_changelist' %}">Documents</a>
-                <a href="{% url 'admin:rentals_extraservice_changelist' %}">Extra Services</a>
-                <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="admin-user-card">
-                    <span class="admin-avatar">{{ request.user.username|first|upper }}</span>
-                    <div>
-                        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                        <small>{{ request.user.email|default:"Admin User" }}</small>
-                    </div>
-                </div>
-                <div class="sidebar-actions">
-                    <a href="{% url 'admin:index' %}">Django Admin</a>
-                    <a href="{% url 'home' %}">Public Site</a>
-                    <a href="{% url 'logout_user' %}">Logout</a>
-                </div>
-            </div>
-        </aside>
+        {% include 'includes/staff_sidebar.html' %}
 
         <main class="dashboard-main">
             <header class="dashboard-topbar">
@@ -54,8 +19,9 @@
                     <div class="dashboard-role-badge">Staff Access</div>
                 </div>
                 <div class="topbar-tools">
-                    <form class="topbar-search" action="{% url 'admin_dashboard' %}" method="get">
-                        <input type="text" name="q" placeholder="Search anything..." disabled>
+                    <form class="topbar-search" action="{% url 'admin_management' %}" method="get">
+                        <input type="hidden" name="section" value="overview">
+                        <input type="text" name="q" placeholder="Search anything...">
                     </form>
                     <div class="topbar-date">{{ today_label }}</div>
                 </div>
@@ -145,7 +111,7 @@
                             <h2>Recent Bookings</h2>
                             <p>The latest reservations and current statuses.</p>
                         </div>
-                        <a class="panel-link" href="{% url 'admin:rentals_booking_changelist' %}">View All</a>
+                        <a class="panel-link" href="{% url 'admin_operations' %}">Open Operations Hub</a>
                     </div>
 
                     {% if recent_bookings %}
@@ -193,7 +159,7 @@
                             <h2>Top Vehicles</h2>
                             <p>Vehicles bringing in the most activity right now.</p>
                         </div>
-                        <a class="panel-link" href="{% url 'admin:rentals_vehicle_changelist' %}">View All</a>
+                        <a class="panel-link" href="{% url 'admin_management' %}?section=vehicles">View All</a>
                     </div>
 
                     <div class="ranking-list">

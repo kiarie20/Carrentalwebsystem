@@ -66,6 +66,64 @@
         </section>
     </div>
 
+    {% if latest_booking %}
+        <section class="content-panel bookings-panel">
+            <div class="section-heading compact-heading">
+                <h2>Current Booking Journey</h2>
+                <p>Your most recent rental is shown here with the next action or update you should expect.</p>
+            </div>
+            <div class="summary-grid detail-summary-grid">
+                <div>
+                    <span>Booking ID</span>
+                    <strong>#BK{{ latest_booking.id }}</strong>
+                </div>
+                <div>
+                    <span>Vehicle</span>
+                    <strong>{{ latest_booking.vehicle.name }}</strong>
+                </div>
+                <div>
+                    <span>Status</span>
+                    <strong>{{ latest_booking.status }}</strong>
+                </div>
+                <div>
+                    <span>Payment</span>
+                    <strong>{% if latest_booking.payment %}{{ latest_booking.payment.status }}{% else %}Pending{% endif %}</strong>
+                </div>
+            </div>
+
+            <div class="benefit-stack booking-benefit-grid">
+                <div class="benefit-stack-item">
+                    <strong>What happens next?</strong>
+                    {% if latest_booking.status == 'Pending' and latest_booking.payment and latest_booking.payment.status != 'Paid' %}
+                        <p>Complete payment to move this booking into the confirmed queue for staff review and handover planning.</p>
+                    {% elif latest_booking.status == 'Confirmed' %}
+                        <p>Your booking is confirmed. Staff can now prepare the vehicle and arrange handover on the travel date.</p>
+                    {% elif latest_booking.status == 'Rented' %}
+                        <p>The vehicle is currently out on hire. The next system step will be return inspection and closure after drop-off.</p>
+                    {% elif latest_booking.status == 'Returned' %}
+                        <p>The vehicle has been checked back in. Staff are finalizing inspection, any charges, and the booking close-out.</p>
+                    {% elif latest_booking.status == 'Completed' %}
+                        <p>This trip has been fully closed in the system. You can keep the confirmation for your records or book again.</p>
+                    {% elif latest_booking.status == 'Cancelled' %}
+                        <p>This booking has been cancelled and will not move forward unless a new reservation is created.</p>
+                    {% else %}
+                        <p>Keep an eye on your booking status and payment section below for the next update.</p>
+                    {% endif %}
+                </div>
+                <div class="benefit-stack-item">
+                    <strong>Verification status</strong>
+                    {% if document_status == 'Approved' %}
+                        <p>Your verification documents are approved, so future bookings can move straight into the reservation and payment flow.</p>
+                    {% elif document_status == 'Rejected' %}
+                        <p>Your documents need attention. Start another booking to upload corrected files and clear the verification issue.</p>
+                    {% else %}
+                        <p>Your documents still need approval before a booking can be fully submitted and confirmed.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    {% endif %}
+
     <section class="content-panel bookings-panel">
         <div class="section-heading compact-heading">
             <h2>Recent Bookings</h2>

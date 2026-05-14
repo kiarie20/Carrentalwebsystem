@@ -1,9 +1,11 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-from .models import Customer, Document, ExtraService, SERVICE_TYPE_CHOICES
+from .models import Customer, Document, ExtraService, ReturnInspection, SERVICE_TYPE_CHOICES
 
 
 class BookingForm(forms.Form):
@@ -34,6 +36,8 @@ class BookingForm(forms.Form):
         extra_queryset = kwargs.pop('extra_queryset', ExtraService.objects.none())
         super().__init__(*args, **kwargs)
         self.fields['selected_extras'].queryset = extra_queryset
+        for field_name in ('pickup_location', 'dropoff_location', 'delivery_location'):
+            self.fields[field_name].widget.attrs.update({'autocomplete': 'off'})
 
     def clean(self):
         cleaned_data = super().clean()
@@ -173,8 +177,12 @@ class PaymentForm(forms.Form):
 
     payment_method = forms.ChoiceField(choices=PAYMENT_METHOD_CHOICES)
     payer_phone = forms.CharField(max_length=20, required=False)
-    transaction_code = forms.CharField(max_length=100)
+    transaction_code = forms.CharField(max_length=100, required=False)
     confirm_terms = forms.BooleanField()
+
+    def __init__(self, *args, **kwargs):
+        self.live_mpesa = kwargs.pop('live_mpesa', False)
+        super().__init__(*args, **kwargs)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -185,7 +193,83 @@ class PaymentForm(forms.Form):
         if payment_method == 'M-Pesa' and not payer_phone:
             self.add_error('payer_phone', 'Enter the phone number used for the M-Pesa payment.')
 
-        if transaction_code and len(transaction_code) < 6:
+        if payment_method != 'M-Pesa' and not transaction_code:
+            self.add_error('transaction_code', 'Enter the transaction reference for this payment method.')
+
+        if payment_method == 'M-Pesa' and not self.live_mpesa and not transaction_code:
+            self.add_error('transaction_code', 'Enter the reference used for the M-Pesa payment or mobile message.')
+
+        if transaction_code and len(transaction_code) < 4:
             self.add_error('transaction_code', 'Enter a valid transaction reference.')
 
         return cleaned_data
+
+
+class RentalStartForm(forms.Form):
+    FUEL_LEVEL_CHOICES = ReturnInspection.FUEL_LEVEL_CHOICES
+
+    odometer_out = forms.IntegerField(min_value=0)
+    fuel_level_out = forms.ChoiceField(choices=FUEL_LEVEL_CHOICES)
+    handover_notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 3}))
+    agreement_signed = forms.BooleanField(required=False, initial=True)
+
+
+class ReturnInspectionForm(forms.ModelForm):
+    fee_fields = ('late_fee', 'fuel_fee', 'cleaning_fee', 'damage_fee', 'other_fee')
+
+    class Meta:
+        model = ReturnInspection
+        fields = (
+            'actual_return_location',
+            'odometer_in',
+            'fuel_level_in',
+            'exterior_condition',
+            'interior_condition',
+            'damage_notes',
+            'late_fee',
+            'fuel_fee',
+            'cleaning_fee',
+            'damage_fee',
+            'other_fee',
+            'requires_maintenance',
+            'final_notes',
+        )
+        widgets = {
+            'damage_notes': forms.Textarea(attrs={'rows': 3}),
+            'final_notes': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fee_fields:
+            self.fields[field_name].required = False
+            if self.initial.get(field_name) in (None, ''):
+                self.initial[field_name] = Decimal('0.00')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        odometer_in = cleaned_data.get('odometer_in')
+        odometer_out = getattr(self.instance, 'odometer_out', None)
+
+        for field_name in self.fee_fields:
+            if cleaned_data.get(field_name) in (None, ''):
+                cleaned_data[field_name] = Decimal('0.00')
+
+        if odometer_in is not None and odometer_out is not None and odometer_in < odometer_out:
+            self.add_error('odometer_in', 'The returned mileage cannot be lower than the handover mileage.')
+
+        return cleaned_data
+
+
+class SettlementForm(forms.Form):
+    PAYMENT_METHOD_CHOICES = PaymentForm.PAYMENT_METHOD_CHOICES
+
+    payment_method = forms.ChoiceField(choices=PAYMENT_METHOD_CHOICES)
+    transaction_reference = forms.CharField(max_length=100)
+    confirm_received = forms.BooleanField()
+
+    def clean_transaction_reference(self):
+        value = self.cleaned_data['transaction_reference'].strip()
+        if len(value) < 4:
+            raise forms.ValidationError('Enter a valid settlement reference.')
+        return value

@@ -85,17 +85,21 @@ class Vehicle(models.Model):
         return self.image_url
 
     def refresh_availability(self):
-        active_bookings = self.booking_set.filter(status__in=['Pending', 'Confirmed'])
+        active_bookings = self.booking_set.filter(status__in=['Pending', 'Confirmed', 'Rented'])
         today = timezone.localdate()
-        current_booking = active_bookings.filter(start_date__lte=today, end_date__gte=today).first()
+        current_rental = active_bookings.filter(status='Rented').order_by('start_date').first()
+        current_booking = active_bookings.filter(status__in=['Pending', 'Confirmed'], start_date__lte=today, end_date__gte=today).first()
         future_booking = active_bookings.filter(start_date__gt=today).order_by('start_date').first()
         latest_booking = active_bookings.order_by('-end_date').first()
 
         if self.status == 'Maintenance':
             return
 
-        if current_booking:
-            self.status = 'Rented' if current_booking.status == 'Confirmed' else 'Booked'
+        if current_rental:
+            self.status = 'Rented'
+            self.next_available_date = current_rental.end_date
+        elif current_booking:
+            self.status = 'Booked'
             self.next_available_date = current_booking.end_date
         elif future_booking:
             self.status = 'Booked'
@@ -147,6 +151,8 @@ class Booking(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Confirmed', 'Confirmed'),
+        ('Rented', 'Rented'),
+        ('Returned', 'Returned'),
         ('Cancelled', 'Cancelled'),
         ('Completed', 'Completed'),
     ]
@@ -166,6 +172,9 @@ class Booking(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    rental_started_at = models.DateTimeField(blank=True, null=True)
+    returned_at = models.DateTimeField(blank=True, null=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
     cancelled_at = models.DateTimeField(blank=True, null=True)
     cancel_reason = models.CharField(max_length=255, blank=True)
 
@@ -176,7 +185,7 @@ class Booking(models.Model):
     def has_conflict(cls, vehicle, start_date, end_date, excluded_booking=None):
         bookings = cls.objects.filter(
             vehicle=vehicle,
-            status__in=['Pending', 'Confirmed'],
+            status__in=['Pending', 'Confirmed', 'Rented'],
             start_date__lte=end_date,
             end_date__gte=start_date,
         )
@@ -192,6 +201,16 @@ class Booking(models.Model):
     def can_cancel(self):
         return self.status in ['Pending', 'Confirmed'] and self.start_date > timezone.localdate()
 
+    def can_start_rental(self):
+        payment = getattr(self, 'payment', None)
+        return self.status == 'Confirmed' and payment and payment.status == 'Paid'
+
+    def can_record_return(self):
+        return self.status == 'Rented'
+
+    def can_complete(self):
+        return self.status == 'Returned'
+
     def cancel(self, reason=''):
         if not self.can_cancel():
             raise ValueError('This booking can no longer be cancelled.')
@@ -206,6 +225,42 @@ class Booking(models.Model):
         self.status = 'Confirmed'
         self.save(update_fields=['status'])
         self.vehicle.refresh_availability()
+
+    def mark_rented(self):
+        if self.status != 'Confirmed':
+            raise ValueError('Only confirmed bookings can be marked as rented.')
+
+        self.status = 'Rented'
+        self.rental_started_at = timezone.now()
+        self.save(update_fields=['status', 'rental_started_at'])
+        self.vehicle.status = 'Rented'
+        self.vehicle.next_available_date = self.end_date
+        self.vehicle.save(update_fields=['status', 'next_available_date'])
+
+    def mark_returned(self):
+        if self.status != 'Rented':
+            raise ValueError('Only active rentals can be marked as returned.')
+
+        self.status = 'Returned'
+        self.returned_at = timezone.now()
+        self.save(update_fields=['status', 'returned_at'])
+        self.vehicle.status = 'Returned'
+        self.vehicle.next_available_date = None
+        self.vehicle.save(update_fields=['status', 'next_available_date'])
+
+    def mark_completed(self, requires_maintenance=False):
+        if self.status != 'Returned':
+            raise ValueError('Only returned bookings can be completed.')
+
+        self.status = 'Completed'
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'completed_at'])
+        if requires_maintenance:
+            self.vehicle.status = 'Maintenance'
+            self.vehicle.next_available_date = None
+            self.vehicle.save(update_fields=['status', 'next_available_date'])
+        else:
+            self.vehicle.refresh_availability()
 
 
 class ExtraService(models.Model):
@@ -294,3 +349,89 @@ class DeliveryAgreement(models.Model):
 
     def __str__(self):
         return f"Agreement for {self.booking}"
+
+
+class ReturnInspection(models.Model):
+    FUEL_LEVEL_CHOICES = [
+        ('Full', 'Full'),
+        ('3/4', '3/4'),
+        ('Half', 'Half'),
+        ('1/4', '1/4'),
+        ('Empty', 'Empty'),
+    ]
+    CONDITION_CHOICES = [
+        ('Good', 'Good'),
+        ('Needs Attention', 'Needs Attention'),
+        ('Damaged', 'Damaged'),
+    ]
+    SETTLEMENT_STATUS_CHOICES = [
+        ('No Charges', 'No Charges'),
+        ('Pending', 'Pending'),
+        ('Paid', 'Paid'),
+    ]
+
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
+    received_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='return_inspections',
+    )
+    checked_in_at = models.DateTimeField(blank=True, null=True)
+    handover_notes = models.TextField(blank=True)
+    actual_return_location = models.CharField(max_length=255, blank=True)
+    odometer_out = models.PositiveIntegerField(blank=True, null=True)
+    odometer_in = models.PositiveIntegerField(blank=True, null=True)
+    fuel_level_out = models.CharField(max_length=20, choices=FUEL_LEVEL_CHOICES, blank=True)
+    fuel_level_in = models.CharField(max_length=20, choices=FUEL_LEVEL_CHOICES, blank=True)
+    exterior_condition = models.CharField(max_length=30, choices=CONDITION_CHOICES, default='Good')
+    interior_condition = models.CharField(max_length=30, choices=CONDITION_CHOICES, default='Good')
+    damage_notes = models.TextField(blank=True)
+    late_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    fuel_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    damage_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    other_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    requires_maintenance = models.BooleanField(default=False)
+    settlement_status = models.CharField(max_length=20, choices=SETTLEMENT_STATUS_CHOICES, default='No Charges')
+    settlement_payment_method = models.CharField(max_length=50, blank=True)
+    settlement_reference = models.CharField(max_length=100, blank=True)
+    settled_at = models.DateTimeField(blank=True, null=True)
+    final_notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Return inspection for {self.booking}"
+
+    @property
+    def total_extra_charges(self):
+        return (
+            (self.late_fee or Decimal('0.00'))
+            + (self.fuel_fee or Decimal('0.00'))
+            + (self.cleaning_fee or Decimal('0.00'))
+            + (self.damage_fee or Decimal('0.00'))
+            + (self.other_fee or Decimal('0.00'))
+        )
+
+    @property
+    def requires_settlement(self):
+        return self.total_extra_charges > Decimal('0.00')
+
+    def sync_settlement_status(self):
+        if self.settlement_status == 'Paid':
+            return
+        self.settlement_status = 'Pending' if self.requires_settlement else 'No Charges'
+
+    def mark_settled(self, payment_method='', reference=''):
+        self.settlement_status = 'Paid'
+        self.settlement_payment_method = payment_method
+        self.settlement_reference = reference.strip()
+        self.settled_at = timezone.now()
+        self.save(
+            update_fields=[
+                'settlement_status',
+                'settlement_payment_method',
+                'settlement_reference',
+                'settled_at',
+            ]
+        )

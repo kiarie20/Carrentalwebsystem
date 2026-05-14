@@ -26,6 +26,12 @@
             </div>
         {% endif %}
 
+        {% if success %}
+            <div class="alert-card alert-success">
+                <strong>{{ success }}</strong>
+            </div>
+        {% endif %}
+
         <div class="payment-layout">
             <section class="content-panel">
                 <div class="booking-vehicle">
@@ -85,18 +91,37 @@
             <section class="content-panel">
                 <div class="section-heading compact-heading">
                     <h2>Payment Details</h2>
-                    <p>Use your actual transaction reference so staff can verify and reconcile the payment quickly.</p>
+                    <p>
+                        {% if live_mpesa %}
+                            Use the customer phone number below and we will send an M-Pesa prompt directly to that handset.
+                        {% else %}
+                            This page is ready for M-Pesa, but the gateway credentials still need to be configured before the site can send a real STK push.
+                        {% endif %}
+                    </p>
                 </div>
 
                 {% if default_payment_method == 'M-Pesa' and mpesa_ready %}
                     <div class="alert-card">
-                        <strong>M-Pesa STK push is enabled.</strong>
-                        <p>Once you submit this form, the customer should receive an M-Pesa payment prompt on their phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.</p>
+                        <strong>M-Pesa {{ mpesa_environment|title }} gateway is enabled.</strong>
+                        <p>
+                            {% if mpesa_environment == 'live' %}
+                                Once you submit this form, the customer should receive a real Safaricom STK push on their phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
+                            {% else %}
+                                Once you submit this form, the customer should receive a sandbox STK push on the configured test phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
+                            {% endif %}
+                        </p>
                     </div>
                 {% elif not mpesa_ready %}
                     <div class="alert-card">
-                        <strong>Demo payment mode is active.</strong>
-                        <p>Live Daraja credentials are not configured yet, so this installation records the payment reference and confirms the booking locally for testing and presentation.</p>
+                        <strong>M-Pesa gateway is not configured yet.</strong>
+                        <p>Add the missing Daraja values to your <code>.env</code> file and use a public HTTPS callback URL if you want this page to send a real STK push instead of staying in local/manual mode.</p>
+                        {% if mpesa_missing_settings %}
+                            <ul class="setup-checklist">
+                                {% for item in mpesa_missing_settings %}
+                                    <li>{{ item }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
                     </div>
                 {% endif %}
 
@@ -113,6 +138,13 @@
                     <div class="field-group">
                         <label for="{{ payment_form.transaction_code.id_for_label }}">Transaction Reference</label>
                         {{ payment_form.transaction_code }}
+                        <small class="field-hint">
+                            {% if live_mpesa %}
+                                Optional for live M-Pesa. Leave it blank if the payment reference will come back from the phone prompt.
+                            {% else %}
+                                Required in demo/manual mode so the staff team has a traceable record.
+                            {% endif %}
+                        </small>
                     </div>
                     <div class="checkbox-field">
                         <label>
@@ -132,7 +164,7 @@
                             {% endfor %}
                         </div>
                     {% endif %}
-                    <button class="primary-button full-width" type="submit">Confirm Payment</button>
+                    <button class="primary-button full-width" type="submit">{{ payment_cta_label }}</button>
                 </form>
             </section>
 

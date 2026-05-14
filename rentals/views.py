@@ -1,15 +1,18 @@
 import csv
 import json
+from urllib.parse import urlencode
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -25,8 +28,17 @@ from .forms import (
     CustomerRegistrationForm,
     DocumentUploadForm,
     PaymentForm,
+    RentalStartForm,
+    ReturnInspectionForm,
+    SettlementForm,
 )
-from .mpesa import MpesaConfigurationError, MpesaGatewayError, initiate_stk_push, mpesa_is_configured
+from .mpesa import (
+    MpesaConfigurationError,
+    MpesaGatewayError,
+    initiate_stk_push,
+    mpesa_is_configured,
+    mpesa_missing_settings,
+)
 from .models import (
     BOOKING_SERVICE_OPTIONS,
     Booking,
@@ -36,6 +48,8 @@ from .models import (
     Document,
     ExtraService,
     Payment,
+    ReturnInspection,
+    SERVICE_TYPE_CHOICES,
     Vehicle,
 )
 
@@ -46,11 +60,59 @@ BENEFITS = [
     {'title': '24/7 Support', 'copy': 'Our support team is always ready to assist you.'},
 ]
 
+COMMON_LOCATION_SUGGESTIONS = [
+    'JKIA Terminal 1A, Nairobi',
+    'Wilson Airport, Nairobi',
+    'Westlands, Nairobi',
+    'Upper Hill, Nairobi',
+    'Karen, Nairobi',
+    'Kilimani, Nairobi',
+    'Lavington, Nairobi',
+    'Two Rivers Mall, Nairobi',
+    'Sarit Centre, Nairobi',
+    'Village Market, Nairobi',
+    'CBD, Nairobi',
+    'Gigiri, Nairobi',
+    'Mombasa Road, Nairobi',
+]
+
+VEHICLE_TYPE_OPTIONS = [
+    ('SUV', 'SUV'),
+    ('Sedan', 'Sedan'),
+    ('Hatchback', 'Hatchback'),
+    ('Pickup', 'Pickup'),
+    ('Van', 'Van'),
+    ('Luxury', 'Luxury'),
+]
+
+TRANSMISSION_OPTIONS = [
+    ('Automatic', 'Automatic'),
+    ('Manual', 'Manual'),
+]
+
+FUEL_TYPE_OPTIONS = [
+    ('Petrol', 'Petrol'),
+    ('Diesel', 'Diesel'),
+    ('Petrol Hybrid', 'Petrol Hybrid'),
+    ('Hybrid', 'Hybrid'),
+    ('Electric', 'Electric'),
+]
+
 
 def get_default_dashboard_url(user):
     if user.is_staff:
         return reverse('admin_dashboard')
     return reverse('account_dashboard')
+
+
+def staff_portal_entry(request, legacy_path=''):
+    if request.user.is_authenticated:
+        if request.user.is_staff:
+            return redirect('admin_dashboard')
+        return redirect('account_dashboard')
+
+    login_query = urlencode({'next': reverse('admin_dashboard')})
+    return redirect(f"{reverse('admin:login')}?{login_query}")
 
 
 def get_customer_for_user(user):
@@ -189,6 +251,24 @@ def build_booking_totals(booking):
     }
 
 
+def build_return_charge_rows(inspection):
+    if not inspection:
+        return []
+
+    charge_map = [
+        ('Late Return Fee', inspection.late_fee),
+        ('Fuel Refill Fee', inspection.fuel_fee),
+        ('Cleaning Fee', inspection.cleaning_fee),
+        ('Damage Fee', inspection.damage_fee),
+        ('Other Fee', inspection.other_fee),
+    ]
+    return [
+        {'label': label, 'amount': amount}
+        for label, amount in charge_map
+        if amount and amount > Decimal('0.00')
+    ]
+
+
 def build_chart_points(values, width=640, height=250, padding=28):
     if not values:
         return ''
@@ -222,6 +302,20 @@ def build_status_gradient(status_rows):
     return f"conic-gradient({', '.join(gradient_parts)})"
 
 
+def build_admin_management_url(section='overview', query=''):
+    params = {'section': section}
+    if query:
+        params['q'] = query
+    return f"{reverse('admin_management')}?{urlencode(params)}"
+
+
+def parse_optional_date(value):
+    raw_value = (value or '').strip()
+    if not raw_value:
+        return None
+    return date.fromisoformat(raw_value)
+
+
 def home(request):
     ensure_demo_vehicles()
     featured = list(Vehicle.objects.filter(is_featured=True).order_by('price_per_day')[:4])
@@ -252,10 +346,13 @@ def car_list(request):
     vehicles = Vehicle.objects.all()
 
     search_query = request.GET.get('q', '').strip()
+    start_date_raw = request.GET.get('start_date', '').strip()
+    end_date_raw = request.GET.get('end_date', '').strip()
     vehicle_type = request.GET.get('type', '').strip()
     transmission = request.GET.get('transmission', '').strip()
     fuel_type = request.GET.get('fuel', '').strip()
     sort = request.GET.get('sort', 'price_asc').strip()
+    date_filter_error = ''
 
     if search_query:
         vehicles = vehicles.filter(
@@ -263,6 +360,23 @@ def car_list(request):
             | Q(model__icontains=search_query)
             | Q(description__icontains=search_query)
         )
+
+    if start_date_raw and end_date_raw:
+        try:
+            parsed_start_date = date.fromisoformat(start_date_raw)
+            parsed_end_date = date.fromisoformat(end_date_raw)
+            if parsed_end_date < parsed_start_date:
+                date_filter_error = 'Drop-off date cannot be earlier than pick-up date.'
+            else:
+                conflicting_vehicle_ids = Booking.objects.filter(
+                    status__in=['Pending', 'Confirmed'],
+                    start_date__lte=parsed_end_date,
+                    end_date__gte=parsed_start_date,
+                ).values_list('vehicle_id', flat=True)
+                vehicles = vehicles.exclude(id__in=conflicting_vehicle_ids).exclude(status='Maintenance')
+        except ValueError:
+            date_filter_error = 'Enter valid pick-up and drop-off dates to filter availability.'
+
     if vehicle_type:
         vehicles = vehicles.filter(vehicle_type=vehicle_type)
     if transmission:
@@ -285,10 +399,13 @@ def car_list(request):
         'active_page': 'cars',
         'page_obj': page_obj,
         'search_query': search_query,
+        'selected_start_date': start_date_raw,
+        'selected_end_date': end_date_raw,
         'selected_type': vehicle_type,
         'selected_transmission': transmission,
         'selected_fuel': fuel_type,
         'selected_sort': sort,
+        'date_filter_error': date_filter_error,
         'vehicle_types': Vehicle.objects.exclude(vehicle_type='').values_list('vehicle_type', flat=True).distinct(),
         'transmission_types': Vehicle.objects.exclude(transmission='').values_list('transmission', flat=True).distinct(),
         'fuel_types': Vehicle.objects.exclude(fuel_type='').values_list('fuel_type', flat=True).distinct(),
@@ -388,12 +505,14 @@ def admin_dashboard(request):
     status_palette = {
         'Confirmed': '#2c66f0',
         'Pending': '#f59e0b',
+        'Rented': '#0d8c81',
+        'Returned': '#8b5cf6',
         'Completed': '#10b981',
         'Cancelled': '#ef4444',
     }
     total_bookings = Booking.objects.count()
     status_rows = []
-    for label in ['Confirmed', 'Pending', 'Completed', 'Cancelled']:
+    for label in ['Confirmed', 'Pending', 'Rented', 'Returned', 'Completed', 'Cancelled']:
         count = Booking.objects.filter(status=label).count()
         percentage = (count / total_bookings * 100) if total_bookings else 0
         status_rows.append(
@@ -408,8 +527,8 @@ def admin_dashboard(request):
     recent_bookings = Booking.objects.select_related('customer__user', 'vehicle').order_by('-created_at')[:5]
     top_vehicles = (
         Vehicle.objects.annotate(
-            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
-            total_revenue=Sum('booking__total_amount', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Rented', 'Returned', 'Completed'])),
+            total_revenue=Sum('booking__total_amount', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Rented', 'Returned', 'Completed'])),
         )
         .order_by('-total_bookings', '-total_revenue', 'name')[:5]
     )
@@ -425,7 +544,7 @@ def admin_dashboard(request):
         {
             'label': 'Total Bookings',
             'value': f"{total_bookings:,}",
-            'note': f"{Booking.objects.filter(status='Confirmed').count()} confirmed",
+            'note': f"{Booking.objects.filter(status='Confirmed').count()} confirmed and {Booking.objects.filter(status='Rented').count()} active",
             'tone': 'green',
             'glyph': 'B',
         },
@@ -462,8 +581,8 @@ def admin_dashboard(request):
         },
         {
             'label': 'Cars On Rent',
-            'value': f"{Vehicle.objects.filter(status__in=['Booked', 'Rented']).count():,}",
-            'note': 'Vehicles currently reserved or out',
+            'value': f"{Vehicle.objects.filter(status='Rented').count():,}",
+            'note': 'Vehicles currently handed over to customers',
             'tone': 'green',
             'glyph': 'R',
         },
@@ -501,12 +620,366 @@ def admin_dashboard(request):
 
 
 @staff_member_required(login_url='admin:login')
+def admin_management(request):
+    ensure_demo_vehicles()
+    ensure_default_extra_services()
+
+    section = request.GET.get('section', 'overview').strip() or 'overview'
+    query = request.GET.get('q', '').strip()
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip()
+        action_section = request.POST.get('section', section).strip() or 'overview'
+        action_query = request.POST.get('q', query).strip()
+        redirect_target = build_admin_management_url(action_section, action_query)
+
+        try:
+            if action == 'vehicle_create':
+                name = (request.POST.get('name') or '').strip()
+                model = (request.POST.get('model') or '').strip()
+                plate_number = (request.POST.get('plate_number') or '').strip().upper()
+                price_raw = (request.POST.get('price_per_day') or '').strip()
+                vehicle_type = (request.POST.get('vehicle_type') or '').strip()
+                transmission = (request.POST.get('transmission') or 'Automatic').strip()
+                fuel_type = (request.POST.get('fuel_type') or 'Petrol').strip()
+                status = (request.POST.get('status') or 'Available').strip()
+                pickup_location = (request.POST.get('pickup_location') or 'Nairobi, Kenya').strip()
+                dropoff_location = (request.POST.get('dropoff_location') or pickup_location or 'Nairobi, Kenya').strip()
+                image_url = (request.POST.get('image_url') or '').strip()
+                year_raw = (request.POST.get('year') or '').strip()
+                mileage_raw = (request.POST.get('mileage') or '').strip()
+                next_available_date = parse_optional_date(request.POST.get('next_available_date'))
+                if not name or not plate_number or not price_raw:
+                    raise ValueError('Name, plate number, and daily rate are required.')
+                if status not in dict(Vehicle.STATUS_CHOICES):
+                    status = 'Available'
+                if status in ['Booked', 'Rented', 'Returned'] and not next_available_date:
+                    next_available_date = timezone.localdate()
+                vehicle = Vehicle.objects.create(
+                    name=name,
+                    model=model,
+                    plate_number=plate_number,
+                    vehicle_type=vehicle_type,
+                    transmission=transmission,
+                    fuel_type=fuel_type,
+                    price_per_day=Decimal(price_raw),
+                    pickup_location=pickup_location,
+                    dropoff_location=dropoff_location,
+                    image_url=image_url,
+                    year=int(year_raw) if year_raw.isdigit() else None,
+                    mileage=int(mileage_raw) if mileage_raw.isdigit() else None,
+                    status=status,
+                    next_available_date=next_available_date,
+                )
+                messages.success(request, f'{vehicle.name} added to the fleet.')
+
+            elif action == 'vehicle_save':
+                vehicle = get_object_or_404(Vehicle, id=request.POST.get('vehicle_id'))
+                price_raw = (request.POST.get('price_per_day') or '').strip()
+                status = (request.POST.get('status') or vehicle.status).strip()
+                next_available_date = parse_optional_date(request.POST.get('next_available_date'))
+                vehicle.name = (request.POST.get('name') or vehicle.name).strip()
+                vehicle.model = (request.POST.get('model') or vehicle.model).strip()
+                vehicle.plate_number = (request.POST.get('plate_number') or vehicle.plate_number).strip().upper()
+                vehicle.vehicle_type = (request.POST.get('vehicle_type') or vehicle.vehicle_type).strip()
+                vehicle.transmission = (request.POST.get('transmission') or vehicle.transmission or 'Automatic').strip()
+                vehicle.fuel_type = (request.POST.get('fuel_type') or vehicle.fuel_type or 'Petrol').strip()
+                vehicle.pickup_location = (request.POST.get('pickup_location') or vehicle.pickup_location).strip()
+                vehicle.dropoff_location = (request.POST.get('dropoff_location') or vehicle.dropoff_location).strip()
+                vehicle.image_url = (request.POST.get('image_url') or vehicle.image_url).strip()
+                vehicle.price_per_day = Decimal(price_raw) if price_raw else vehicle.price_per_day
+                vehicle.is_featured = request.POST.get('is_featured') == 'on'
+                if status in dict(Vehicle.STATUS_CHOICES):
+                    vehicle.status = status
+                vehicle.next_available_date = next_available_date
+                if vehicle.status == 'Available' and not vehicle.next_available_date:
+                    vehicle.next_available_date = None
+                elif vehicle.status in ['Booked', 'Rented', 'Returned'] and not vehicle.next_available_date:
+                    vehicle.next_available_date = timezone.localdate()
+                vehicle.save(
+                    update_fields=[
+                        'name',
+                        'model',
+                        'plate_number',
+                        'vehicle_type',
+                        'transmission',
+                        'fuel_type',
+                        'pickup_location',
+                        'dropoff_location',
+                        'image_url',
+                        'price_per_day',
+                        'is_featured',
+                        'status',
+                        'next_available_date',
+                    ]
+                )
+                messages.success(request, f'{vehicle.name} updated successfully.')
+
+            elif action == 'vehicle_delete':
+                vehicle = get_object_or_404(Vehicle, id=request.POST.get('vehicle_id'))
+                if vehicle.booking_set.exists():
+                    messages.error(
+                        request,
+                        f'{vehicle.name} already has booking history, so it cannot be deleted. Mark it unavailable or maintenance instead.',
+                    )
+                else:
+                    vehicle_name = vehicle.name
+                    vehicle.delete()
+                    messages.success(request, f'{vehicle_name} removed from the fleet.')
+
+            elif action == 'booking_update':
+                booking = get_object_or_404(
+                    Booking.objects.select_related('payment', 'vehicle', 'customer__user'),
+                    id=request.POST.get('booking_id'),
+                )
+                new_start = date.fromisoformat((request.POST.get('start_date') or '').strip())
+                new_end = date.fromisoformat((request.POST.get('end_date') or '').strip())
+                if new_end < new_start:
+                    raise ValueError('Drop-off date cannot be earlier than pick-up date.')
+
+                if booking.status in ['Rented', 'Returned', 'Completed']:
+                    messages.error(
+                        request,
+                        f'Booking #{booking.id} is already in the rental lifecycle. Use the workflow page for active or completed trips.',
+                    )
+                    return redirect(redirect_target)
+
+                booking.pickup_location = (request.POST.get('pickup_location') or booking.pickup_location).strip()
+                booking.dropoff_location = (request.POST.get('dropoff_location') or booking.dropoff_location).strip()
+                selected_service_type = (request.POST.get('service_type') or booking.service_type).strip()
+                if selected_service_type in dict(SERVICE_TYPE_CHOICES):
+                    booking.service_type = selected_service_type
+                booking.start_date = new_start
+                booking.end_date = new_end
+
+                if Booking.has_conflict(booking.vehicle, booking.start_date, booking.end_date, excluded_booking=booking):
+                    messages.error(request, f'Booking #{booking.id} now conflicts with another reservation for this vehicle.')
+                    return redirect(redirect_target)
+
+                extras = [item.service for item in booking.booking_extras.select_related('service')]
+                pricing = build_pricing(
+                    booking.vehicle,
+                    booking.start_date,
+                    booking.end_date,
+                    service_type=booking.service_type,
+                    selected_extras=extras,
+                )
+                booking.service_fee = pricing['service']['total']
+                booking.total_amount = pricing['total']
+                booking.save(
+                    update_fields=[
+                        'pickup_location',
+                        'dropoff_location',
+                        'service_type',
+                        'start_date',
+                        'end_date',
+                        'service_fee',
+                        'total_amount',
+                    ]
+                )
+
+                total_days = pricing['total_days']
+                for booking_extra in booking.booking_extras.select_related('service'):
+                    booking_extra.total_amount = booking_extra.service.calculate_total(total_days)
+                    booking_extra.save(update_fields=['total_amount'])
+
+                if hasattr(booking, 'payment'):
+                    booking.payment.amount = pricing['total']
+                    booking.payment.save(update_fields=['amount'])
+
+                requested_status = (request.POST.get('status') or booking.status).strip()
+                if requested_status == 'Cancelled' and booking.status != 'Cancelled':
+                    if booking.can_cancel():
+                        booking.cancel((request.POST.get('status_note') or '').strip())
+                    else:
+                        messages.error(request, f'Booking #{booking.id} can no longer be cancelled from management.')
+                        return redirect(redirect_target)
+                elif requested_status == 'Confirmed' and booking.status != 'Confirmed':
+                    if booking.payment and booking.payment.status == 'Paid':
+                        booking.mark_confirmed()
+                    else:
+                        messages.error(request, f'Booking #{booking.id} cannot be confirmed until payment is marked paid.')
+                        return redirect(redirect_target)
+                elif requested_status == 'Pending' and booking.status != 'Pending':
+                    booking.status = 'Pending'
+                    booking.save(update_fields=['status'])
+
+                booking.vehicle.refresh_availability()
+                messages.success(request, f'Booking #{booking.id} updated successfully.')
+
+            elif action == 'payment_update':
+                payment = get_object_or_404(Payment.objects.select_related('booking'), id=request.POST.get('payment_id'))
+                status = (request.POST.get('status') or payment.status).strip()
+                transaction_code = (request.POST.get('transaction_code') or payment.transaction_code).strip()
+                payment_method = (request.POST.get('payment_method') or payment.payment_method).strip()
+                if status == 'Paid':
+                    payment.payer_phone = (request.POST.get('payer_phone') or payment.payer_phone).strip()
+                    payment.save(update_fields=['payer_phone'])
+                    payment.mark_paid(payment_method=payment_method, transaction_code=transaction_code)
+                    if payment.booking.status == 'Pending':
+                        payment.booking.mark_confirmed()
+                elif status == 'Failed':
+                    payment.mark_failed(payment_method=payment_method, gateway_response='Marked failed by staff from management hub.')
+                else:
+                    payment.status = 'Pending'
+                    payment.payment_method = payment_method
+                    payment.transaction_code = transaction_code
+                    payment.payer_phone = (request.POST.get('payer_phone') or payment.payer_phone).strip()
+                    payment.save(update_fields=['status', 'payment_method', 'transaction_code', 'payer_phone'])
+                messages.success(request, f'Payment #PY{payment.id} updated.')
+
+            elif action == 'document_review':
+                document = get_object_or_404(Document, id=request.POST.get('document_id'))
+                status = (request.POST.get('verification_status') or document.verification_status).strip()
+                notes = (request.POST.get('review_notes') or '').strip()
+                if status in dict(Document.STATUS_CHOICES):
+                    document.mark_reviewed(status, reviewed_by=request.user, notes=notes)
+                    messages.success(request, f'Documents for {document.customer.user.username} marked as {status}.')
+
+            elif action == 'service_update':
+                service = get_object_or_404(ExtraService, id=request.POST.get('service_id'))
+                price_raw = (request.POST.get('price') or '').strip()
+                pricing_mode = (request.POST.get('pricing_mode') or service.pricing_mode).strip()
+                display_order_raw = (request.POST.get('display_order') or '').strip()
+                service.price = Decimal(price_raw) if price_raw else service.price
+                if pricing_mode in dict(ExtraService.PRICING_MODE_CHOICES):
+                    service.pricing_mode = pricing_mode
+                service.is_active = request.POST.get('is_active') == 'on'
+                if display_order_raw.isdigit():
+                    service.display_order = int(display_order_raw)
+                service.save(update_fields=['price', 'pricing_mode', 'is_active', 'display_order'])
+                messages.success(request, f'{service.name} updated successfully.')
+
+            elif action == 'user_update':
+                managed_user = get_object_or_404(User, id=request.POST.get('user_id'))
+                managed_user.is_staff = request.POST.get('is_staff') == 'on'
+                managed_user.is_active = request.POST.get('is_active') == 'on'
+                managed_user.save(update_fields=['is_staff', 'is_active'])
+                messages.success(request, f'Access settings updated for {managed_user.username}.')
+
+            elif action == 'customer_update':
+                customer = get_object_or_404(Customer.objects.select_related('user'), id=request.POST.get('customer_id'))
+                full_name = (request.POST.get('full_name') or '').strip() or customer.user.first_name or customer.user.username
+                email = (request.POST.get('email') or customer.user.username).strip().lower()
+                if User.objects.exclude(pk=customer.user.pk).filter(username=email).exists():
+                    raise ValueError('Another account already uses that email.')
+                customer.user.first_name = full_name
+                customer.user.username = email
+                customer.user.email = email
+                customer.user.save(update_fields=['first_name', 'username', 'email'])
+                customer.phone = (request.POST.get('phone') or '').strip()
+                customer.national_id_number = (request.POST.get('national_id_number') or '').strip()
+                customer.address = (request.POST.get('address') or '').strip()
+                customer.save(update_fields=['phone', 'national_id_number', 'address'])
+                messages.success(request, f'Customer profile updated for {customer.user.username}.')
+        except (InvalidOperation, ValueError, IntegrityError):
+            messages.error(request, 'One of the values submitted was invalid. Please check the form and try again.')
+
+        return redirect(redirect_target)
+
+    vehicles = Vehicle.objects.order_by('name')
+    bookings = Booking.objects.select_related('customer__user', 'vehicle', 'payment').order_by('-created_at')
+    customers = Customer.objects.select_related('user').order_by('user__username')
+    payments = Payment.objects.select_related('booking__customer__user', 'booking__vehicle').order_by('-id')
+    documents = Document.objects.select_related('customer__user', 'reviewed_by').order_by('-uploaded_at')
+    services = ExtraService.objects.order_by('display_order', 'name')
+    users = User.objects.order_by('username')
+
+    if query:
+        vehicles = vehicles.filter(
+            Q(name__icontains=query)
+            | Q(model__icontains=query)
+            | Q(plate_number__icontains=query)
+            | Q(vehicle_type__icontains=query)
+        )
+        booking_filters = (
+            Q(vehicle__name__icontains=query)
+            | Q(customer__user__username__icontains=query)
+            | Q(customer__user__first_name__icontains=query)
+            | Q(status__icontains=query)
+        )
+        if query.isdigit():
+            booking_filters |= Q(id=int(query))
+        bookings = bookings.filter(booking_filters)
+        customers = customers.filter(
+            Q(user__username__icontains=query)
+            | Q(user__first_name__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(address__icontains=query)
+        )
+        payments = payments.filter(
+            Q(transaction_code__icontains=query)
+            | Q(payment_method__icontains=query)
+            | Q(status__icontains=query)
+            | Q(booking__vehicle__name__icontains=query)
+            | Q(booking__customer__user__username__icontains=query)
+        )
+        documents = documents.filter(
+            Q(customer__user__username__icontains=query)
+            | Q(customer__user__first_name__icontains=query)
+            | Q(verification_status__icontains=query)
+            | Q(review_notes__icontains=query)
+        )
+        services = services.filter(
+            Q(name__icontains=query)
+            | Q(code__icontains=query)
+            | Q(description__icontains=query)
+        )
+        users = users.filter(
+            Q(username__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(email__icontains=query)
+        )
+
+    section_cards = [
+        {'code': 'overview', 'label': 'Overview', 'value': '1 hub'},
+        {'code': 'vehicles', 'label': 'Fleet', 'value': f'{Vehicle.objects.count():,}'},
+        {'code': 'bookings', 'label': 'Bookings', 'value': f'{Booking.objects.count():,}'},
+        {'code': 'customers', 'label': 'Customers', 'value': f'{Customer.objects.count():,}'},
+        {'code': 'payments', 'label': 'Payments', 'value': f'{Payment.objects.count():,}'},
+        {'code': 'documents', 'label': 'Documents', 'value': f'{Document.objects.count():,}'},
+        {'code': 'services', 'label': 'Services', 'value': f'{ExtraService.objects.count():,}'},
+        {'code': 'users', 'label': 'Users', 'value': f'{User.objects.count():,}'},
+    ]
+
+    context = {
+        'today_label': timezone.localdate().strftime('%d %b %Y'),
+        'management_section': section,
+        'management_query': query,
+        'show_management_overview': section == 'overview',
+        'section_cards': section_cards,
+        'vehicle_status_choices': Vehicle.STATUS_CHOICES,
+        'vehicle_type_options': VEHICLE_TYPE_OPTIONS,
+        'transmission_options': TRANSMISSION_OPTIONS,
+        'fuel_type_options': FUEL_TYPE_OPTIONS,
+        'booking_status_choices': Booking.STATUS_CHOICES,
+        'document_status_choices': Document.STATUS_CHOICES,
+        'payment_status_choices': Payment.STATUS_CHOICES,
+        'payment_method_choices': PaymentForm.PAYMENT_METHOD_CHOICES,
+        'pricing_mode_choices': ExtraService.PRICING_MODE_CHOICES,
+        'service_type_choices': SERVICE_TYPE_CHOICES,
+        'vehicles': vehicles[:12],
+        'bookings': bookings[:12],
+        'customers': customers[:12],
+        'payments': payments[:12],
+        'documents': documents[:12],
+        'services': services[:12],
+        'users': users[:12],
+        'query_result_total': sum(
+            queryset.count()
+            for queryset in (vehicles, bookings, customers, payments, documents, services, users)
+        ),
+    }
+    return render(request, 'admin_management.html', context)
+
+
+@staff_member_required(login_url='admin:login')
 def admin_reports(request):
     today = timezone.localdate()
     current_month_start = today.replace(day=1)
 
     booking_status_rows = []
-    for status in ['Pending', 'Confirmed', 'Completed', 'Cancelled']:
+    for status in ['Pending', 'Confirmed', 'Rented', 'Returned', 'Completed', 'Cancelled']:
         booking_status_rows.append(
             {
                 'label': status,
@@ -525,8 +998,8 @@ def admin_reports(request):
 
     top_customer_rows = (
         Customer.objects.annotate(
-            total_spend=Sum('booking__total_amount', filter=Q(booking__status__in=['Confirmed', 'Completed'])),
-            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+            total_spend=Sum('booking__total_amount', filter=Q(booking__status__in=['Confirmed', 'Rented', 'Returned', 'Completed'])),
+            total_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Rented', 'Returned', 'Completed'])),
         )
         .select_related('user')
         .order_by('-total_spend', '-total_bookings', 'user__username')[:8]
@@ -534,7 +1007,7 @@ def admin_reports(request):
 
     fleet_utilisation_rows = (
         Vehicle.objects.annotate(
-            active_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Completed'])),
+            active_bookings=Count('booking', filter=Q(booking__status__in=['Pending', 'Confirmed', 'Rented', 'Returned', 'Completed'])),
             paid_revenue=Sum('booking__payment__amount', filter=Q(booking__payment__status='Paid')),
         )
         .order_by('-active_bookings', '-paid_revenue', 'name')[:8]
@@ -659,6 +1132,169 @@ def export_report_csv(request, report_type):
     return HttpResponse('Unknown report type.', status=404)
 
 
+@staff_member_required(login_url='admin:login')
+def admin_operations(request):
+    ensure_demo_vehicles()
+    operations_queryset = Booking.objects.select_related('customer__user', 'vehicle', 'payment', 'returninspection').prefetch_related('booking_extras__service')
+    ready_for_handover = operations_queryset.filter(status='Confirmed', payment__status='Paid').order_by('start_date', 'id')[:8]
+    active_rentals = operations_queryset.filter(status='Rented').order_by('end_date', 'id')[:8]
+    returns_pending = operations_queryset.filter(status='Returned').order_by('-returned_at', '-id')[:8]
+    recently_completed = operations_queryset.filter(status='Completed').order_by('-completed_at', '-id')[:8]
+
+    for bucket in (ready_for_handover, active_rentals, returns_pending, recently_completed):
+        for booking in bucket:
+            booking.workflow_inspection = getattr(booking, 'returninspection', None)
+
+    operation_cards = [
+        {
+            'label': 'Ready For Handover',
+            'value': f"{operations_queryset.filter(status='Confirmed', payment__status='Paid').count():,}",
+            'note': 'Paid bookings that can now be released to customers',
+            'tone': 'blue',
+            'glyph': 'H',
+        },
+        {
+            'label': 'Active Rentals',
+            'value': f"{operations_queryset.filter(status='Rented').count():,}",
+            'note': 'Vehicles currently out with customers',
+            'tone': 'green',
+            'glyph': 'R',
+        },
+        {
+            'label': 'Returns Pending Closure',
+            'value': f"{operations_queryset.filter(status='Returned').count():,}",
+            'note': 'Returned vehicles still awaiting final settlement or completion',
+            'tone': 'gold',
+            'glyph': 'T',
+        },
+        {
+            'label': 'Maintenance Holds',
+            'value': f"{Vehicle.objects.filter(status='Maintenance').count():,}",
+            'note': 'Vehicles held back after inspection or repair needs',
+            'tone': 'rose',
+            'glyph': 'M',
+        },
+    ]
+
+    context = {
+        'today_label': timezone.localdate().strftime('%d %b %Y'),
+        'operation_cards': operation_cards,
+        'ready_for_handover': ready_for_handover,
+        'active_rentals': active_rentals,
+        'returns_pending': returns_pending,
+        'recently_completed': recently_completed,
+    }
+    return render(request, 'admin_operations.html', context)
+
+
+@staff_member_required(login_url='admin:login')
+def admin_booking_workflow(request, booking_id):
+    booking = get_object_or_404(
+        Booking.objects.select_related('customer__user', 'vehicle', 'payment'),
+        id=booking_id,
+    )
+    inspection = ReturnInspection.objects.filter(booking=booking).first()
+    payment = getattr(booking, 'payment', None)
+    delivery_agreement = getattr(booking, 'deliveryagreement', None)
+
+    start_form = RentalStartForm(
+        initial={
+            'odometer_out': inspection.odometer_out if inspection and inspection.odometer_out is not None else booking.vehicle.mileage,
+            'fuel_level_out': inspection.fuel_level_out or 'Full' if inspection else 'Full',
+            'handover_notes': inspection.handover_notes if inspection else '',
+            'agreement_signed': delivery_agreement.agreement_signed if delivery_agreement else True,
+        }
+    )
+    return_form = ReturnInspectionForm(
+        instance=inspection,
+        initial={
+            'actual_return_location': inspection.actual_return_location if inspection and inspection.actual_return_location else booking.dropoff_location,
+        },
+    )
+    settlement_form = SettlementForm()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'start_rental':
+            start_form = RentalStartForm(request.POST)
+            if not booking.can_start_rental():
+                messages.error(request, 'This booking must be confirmed and fully paid before the rental can start.')
+            elif start_form.is_valid():
+                with transaction.atomic():
+                    inspection = inspection or ReturnInspection(booking=booking)
+                    inspection.odometer_out = start_form.cleaned_data['odometer_out']
+                    inspection.fuel_level_out = start_form.cleaned_data['fuel_level_out']
+                    inspection.handover_notes = start_form.cleaned_data['handover_notes']
+                    inspection.save()
+                    if delivery_agreement and start_form.cleaned_data['agreement_signed']:
+                        delivery_agreement.agreement_signed = True
+                        delivery_agreement.save(update_fields=['agreement_signed'])
+                    booking.mark_rented()
+                messages.success(request, 'Rental handover recorded. The booking is now marked as rented.')
+                return redirect('admin_booking_workflow', booking_id=booking.id)
+
+        elif action == 'record_return':
+            return_form = ReturnInspectionForm(request.POST, instance=inspection)
+            if not booking.can_record_return():
+                messages.error(request, 'Only active rentals can be checked back in.')
+            elif return_form.is_valid():
+                with transaction.atomic():
+                    inspection = return_form.save(commit=False)
+                    inspection.booking = booking
+                    inspection.received_by = request.user
+                    inspection.checked_in_at = timezone.now()
+                    if not inspection.actual_return_location:
+                        inspection.actual_return_location = booking.dropoff_location
+                    inspection.sync_settlement_status()
+                    inspection.save()
+                    booking.mark_returned()
+                messages.success(request, 'Vehicle return recorded. Review any charges before completing the booking.')
+                return redirect('admin_booking_workflow', booking_id=booking.id)
+
+        elif action == 'settle_charges':
+            settlement_form = SettlementForm(request.POST)
+            if not inspection or not inspection.requires_settlement:
+                messages.error(request, 'There are no outstanding return charges to settle on this booking.')
+            elif settlement_form.is_valid():
+                inspection.mark_settled(
+                    payment_method=settlement_form.cleaned_data['payment_method'],
+                    reference=settlement_form.cleaned_data['transaction_reference'],
+                )
+                messages.success(request, 'Final charges have been marked as settled.')
+                return redirect('admin_booking_workflow', booking_id=booking.id)
+
+        elif action == 'complete_booking':
+            if not booking.can_complete():
+                messages.error(request, 'The booking must be returned before it can be completed.')
+            elif not inspection:
+                messages.error(request, 'Record the return inspection first before completing the booking.')
+            elif inspection.requires_settlement and inspection.settlement_status != 'Paid':
+                messages.error(request, 'Settle the outstanding return charges before completing the booking.')
+            else:
+                with transaction.atomic():
+                    booking.mark_completed(requires_maintenance=inspection.requires_maintenance)
+                messages.success(request, 'Booking completed successfully and the vehicle has been returned to the fleet workflow.')
+                return redirect('admin_operations')
+
+    charge_rows = build_return_charge_rows(inspection)
+    totals = build_booking_totals(booking)
+    context = {
+        'today_label': timezone.localdate().strftime('%d %b %Y'),
+        'booking': booking,
+        'payment': payment,
+        'inspection': inspection,
+        'delivery_agreement': delivery_agreement,
+        'selected_extras': booking.booking_extras.select_related('service').all(),
+        'totals': totals,
+        'charge_rows': charge_rows,
+        'start_form': start_form,
+        'return_form': return_form,
+        'settlement_form': settlement_form,
+    }
+    return render(request, 'admin_booking_workflow.html', context)
+
+
 @login_required(login_url='auth_page')
 def account_dashboard(request):
     customer = get_customer_for_user(request.user)
@@ -682,13 +1318,16 @@ def account_dashboard(request):
         .prefetch_related('booking_extras__service')
         .order_by('-created_at')
     )
+    latest_booking = bookings.first()
     context = {
         'active_page': 'account',
         'customer': customer,
         'document': document,
+        'document_status': document.verification_status if document else 'Missing',
         'document_review_notes': document.review_notes if document and document.review_notes else '',
         'profile_form': profile_form,
         'bookings': bookings,
+        'latest_booking': latest_booking,
     }
     return render(request, 'account_dashboard.html', context)
 
@@ -722,7 +1361,10 @@ def book_vehicle(request, vehicle_id):
         'benefits': BENEFITS,
         'extra_services': available_extras,
         'selected_extra_ids': [],
+        'selected_extra_codes': [],
         'document_form': None,
+        'show_document_upload': False,
+        'location_suggestions': COMMON_LOCATION_SUGGESTIONS,
     }
 
     if request.method == 'POST':
@@ -734,6 +1376,7 @@ def book_vehicle(request, vehicle_id):
         document = Document.objects.filter(customer=customer).first()
         context['document_status'] = document.verification_status if document else 'Missing'
         context['document_review_notes'] = document.review_notes if document and document.review_notes else ''
+        context['show_document_upload'] = not document or document.verification_status != 'Approved'
         action = request.POST.get('action', 'booking')
 
         if action == 'documents':
@@ -752,6 +1395,7 @@ def book_vehicle(request, vehicle_id):
                 uploaded_document.review_notes = ''
                 uploaded_document.save()
                 context['document_status'] = uploaded_document.verification_status
+                context['show_document_upload'] = uploaded_document.verification_status != 'Approved'
                 context['success'] = 'Documents uploaded successfully. They are now awaiting admin verification.'
                 context['document_form'] = DocumentUploadForm(instance=uploaded_document)
             else:
@@ -768,6 +1412,7 @@ def book_vehicle(request, vehicle_id):
                 selected_extras = list(form.cleaned_data['selected_extras'])
                 context['selected_service_type'] = service_type
                 context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
+                context['selected_extra_codes'] = [extra.code for extra in selected_extras]
                 context['pricing'] = build_pricing(
                     vehicle,
                     start_date,
@@ -828,6 +1473,7 @@ def book_vehicle(request, vehicle_id):
                 context['selected_service_type'] = selected_service_type
                 selected_extras = list(available_extras.filter(id__in=request.POST.getlist('selected_extras')))
                 context['selected_extra_ids'] = [str(extra.id) for extra in selected_extras]
+                context['selected_extra_codes'] = [extra.code for extra in selected_extras]
                 if start_date and end_date:
                     try:
                         parsed_start = date.fromisoformat(start_date)
@@ -850,6 +1496,7 @@ def book_vehicle(request, vehicle_id):
             document = Document.objects.filter(customer=customer).first()
             context['document_status'] = document.verification_status if document else 'Missing'
             context['document_review_notes'] = document.review_notes if document and document.review_notes else ''
+            context['show_document_upload'] = not document or document.verification_status != 'Approved'
             context['document_form'] = DocumentUploadForm(instance=document)
     else:
         context['document_form'] = DocumentUploadForm()
@@ -872,11 +1519,14 @@ def booking_payment(request, booking_id):
     if payment.status == 'Paid':
         return redirect('booking_confirmation', booking_id=booking.id)
 
+    live_mpesa = mpesa_is_configured()
+    mpesa_missing = mpesa_missing_settings()
+    mpesa_environment = (settings.MPESA_ENVIRONMENT or 'sandbox').strip().lower()
     initial = {
         'payment_method': payment.payment_method or 'M-Pesa',
         'payer_phone': customer.phone,
     }
-    form = PaymentForm(initial=initial)
+    form = PaymentForm(initial=initial, live_mpesa=live_mpesa)
     context = {
         'active_page': 'account',
         'booking': booking,
@@ -885,19 +1535,29 @@ def booking_payment(request, booking_id):
         'selected_extras': selected_extras,
         'delivery_agreement': delivery_agreement,
         'totals': build_booking_totals(booking),
-        'mpesa_ready': mpesa_is_configured(),
+        'mpesa_ready': live_mpesa,
+        'live_mpesa': live_mpesa,
+        'mpesa_missing_settings': mpesa_missing,
+        'mpesa_environment': mpesa_environment,
         'default_payment_method': payment.payment_method or 'M-Pesa',
+        'payment_cta_label': (
+            'Send Live M-Pesa Prompt'
+            if live_mpesa and mpesa_environment == 'live'
+            else 'Send Sandbox M-Pesa Prompt'
+            if live_mpesa
+            else 'Submit Payment Reference'
+        ),
     }
 
     if request.method == 'POST':
-        form = PaymentForm(request.POST)
+        form = PaymentForm(request.POST, live_mpesa=live_mpesa)
         context['payment_form'] = form
         if form.is_valid():
             payment_method = form.cleaned_data['payment_method']
             payer_phone = form.cleaned_data['payer_phone']
             transaction_code = form.cleaned_data['transaction_code']
 
-            if payment_method == 'M-Pesa' and mpesa_is_configured():
+            if payment_method == 'M-Pesa' and live_mpesa:
                 try:
                     gateway_response = initiate_stk_push(
                         amount=payment.amount,

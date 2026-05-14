@@ -202,10 +202,26 @@ def ensure_demo_vehicles():
         else:
             payload['next_available_date'] = None
         payload['image'] = None
-        Vehicle.objects.update_or_create(
+        vehicle, created = Vehicle.objects.get_or_create(
             plate_number=payload['plate_number'],
             defaults=payload,
         )
+        if created:
+            continue
+
+        # Preserve staff-managed pricing, featured state, and availability while still
+        # backfilling older demo rows that may be missing newer descriptive fields.
+        updated_fields = []
+        for field_name, value in payload.items():
+            current_value = getattr(vehicle, field_name)
+            if field_name in {'status', 'next_available_date', 'price_per_day', 'is_featured'}:
+                continue
+            if current_value in (None, '', 0) and value not in (None, '', 0):
+                setattr(vehicle, field_name, value)
+                updated_fields.append(field_name)
+
+        if updated_fields:
+            vehicle.save(update_fields=updated_fields)
 
 
 def ensure_default_extra_services():

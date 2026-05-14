@@ -1,6 +1,7 @@
 import json
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -8,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Booking, BookingExtra, Customer, Document, ExtraService, Payment, Vehicle
+from .models import Booking, BookingExtra, Customer, Document, ExtraService, Payment, ReturnInspection, Vehicle
 
 
 class PublicPageTests(TestCase):
@@ -20,6 +21,7 @@ class PublicPageTests(TestCase):
         self.assertContains(response, 'Featured Fleet')
         self.assertContains(response, 'How it works')
         self.assertContains(response, 'Verify Identity')
+        self.assertContains(response, 'Search Car')
 
     def test_admin_login_page_shows_staff_only_message(self):
         response = self.client.get(f"{reverse('admin:login')}?next={reverse('admin_dashboard')}")
@@ -175,6 +177,49 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(booking.status, 'Confirmed')
         self.assertEqual(self.vehicle.status, 'Booked')
 
+    @patch('rentals.views.initiate_stk_push')
+    @patch('rentals.views.mpesa_is_configured', return_value=True)
+    def test_live_mpesa_payment_submission_allows_blank_transaction_code(self, _mock_ready, mock_stk_push):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=timezone.localdate() + timedelta(days=3),
+            end_date=timezone.localdate() + timedelta(days=5),
+            total_amount=Decimal('7500.00'),
+            status='Pending',
+        )
+        payment = Payment.objects.create(
+            booking=booking,
+            amount=Decimal('7500.00'),
+            status='Pending',
+        )
+        mock_stk_push.return_value = {
+            'MerchantRequestID': 'merchant-123',
+            'CheckoutRequestID': 'checkout-456',
+            'CustomerMessage': 'STK prompt sent.',
+            'normalized_phone': '254712345678',
+        }
+
+        response = self.client.post(
+            reverse('booking_payment', args=[booking.id]),
+            {
+                'payment_method': 'M-Pesa',
+                'payer_phone': '0712345678',
+                'transaction_code': '',
+                'confirm_terms': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'Pending')
+        self.assertEqual(payment.transaction_code, '')
+        self.assertContains(response, 'STK prompt sent.')
+        mock_stk_push.assert_called_once()
+
     def test_booking_confirmation_redirects_if_payment_not_done(self):
         self.client.login(username='customer1@example.com', password='pass12345')
         booking = Booking.objects.create(
@@ -196,6 +241,30 @@ class BookingWorkflowTests(TestCase):
         response = self.client.get(reverse('booking_confirmation', args=[booking.id]))
 
         self.assertRedirects(response, reverse('booking_payment', args=[booking.id]))
+
+    def test_payment_page_shows_gateway_setup_message_when_mpesa_not_configured(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        booking = Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=timezone.localdate() + timedelta(days=2),
+            end_date=timezone.localdate() + timedelta(days=4),
+            total_amount=Decimal('7500.00'),
+            status='Pending',
+        )
+        Payment.objects.create(
+            booking=booking,
+            amount=Decimal('7500.00'),
+            status='Pending',
+        )
+
+        response = self.client.get(reverse('booking_payment', args=[booking.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'M-Pesa gateway is not configured yet.')
+        self.assertContains(response, 'MPESA_CONSUMER_KEY')
 
     def test_mpesa_callback_marks_pending_payment_paid(self):
         booking = Booking.objects.create(
@@ -249,6 +318,65 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(payment.transaction_code, 'QXE4455')
         self.assertEqual(payment.payer_phone, '254712345678')
         self.assertEqual(booking.status, 'Confirmed')
+
+    def test_car_list_filters_by_search_query(self):
+        Vehicle.objects.create(
+            name='Mombasa Shuttle',
+            model='Coaster',
+            plate_number='KDB 222B',
+            vehicle_type='Van',
+            transmission='Manual',
+            fuel_type='Diesel',
+            price_per_day=Decimal('7000.00'),
+            pickup_location='Mombasa, Kenya',
+            dropoff_location='Mombasa, Kenya',
+            description='A coastal transfer van.',
+            status='Available',
+        )
+
+        response = self.client.get(reverse('car_list'), {'q': 'Corolla'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Toyota Corolla')
+        self.assertNotContains(response, 'Mombasa Shuttle')
+        self.assertNotContains(response, 'Pick-up Area / Landmark')
+
+    def test_car_list_date_filter_excludes_conflicting_vehicle(self):
+        backup_vehicle = Vehicle.objects.create(
+            name='Mazda Demio',
+            model='Skyactiv',
+            plate_number='KDB 333C',
+            vehicle_type='Hatchback',
+            transmission='Automatic',
+            fuel_type='Petrol',
+            price_per_day=Decimal('2800.00'),
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            description='Backup city car.',
+            status='Available',
+        )
+        Booking.objects.create(
+            customer=self.customer,
+            vehicle=self.vehicle,
+            pickup_location='Nairobi, Kenya',
+            dropoff_location='Nairobi, Kenya',
+            start_date=self.future_start,
+            end_date=self.future_end,
+            total_amount=Decimal('7500.00'),
+            status='Confirmed',
+        )
+
+        response = self.client.get(
+            reverse('car_list'),
+            {
+                'start_date': self.future_start.isoformat(),
+                'end_date': self.future_end.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, f'href="/cars/{self.vehicle.id}/"', html=False)
+        self.assertContains(response, backup_vehicle.name)
 
     def test_booking_rejects_overlapping_dates(self):
         self.client.login(username='customer1@example.com', password='pass12345')
@@ -366,6 +494,15 @@ class BookingWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Upload Documents for Verification')
+
+    def test_booking_page_hides_document_upload_section_when_approved(self):
+        self.client.login(username='customer1@example.com', password='pass12345')
+        Document.objects.filter(customer=self.customer).update(verification_status='Approved')
+
+        response = self.client.get(reverse('book_vehicle', args=[self.vehicle.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Upload Documents for Verification')
 
 
 class ApiTests(TestCase):
@@ -525,11 +662,18 @@ class AdminDashboardTests(TestCase):
         Payment.objects.create(
             booking=self.booking,
             amount=Decimal('45000.00'),
-            status='Pending',
+            status='Paid',
+            paid_at=timezone.now(),
         )
 
     def test_admin_dashboard_requires_staff_login(self):
         response = self.client.get(reverse('admin_dashboard'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('admin:login'), response.url)
+
+    def test_admin_root_redirects_to_staff_entry_flow(self):
+        response = self.client.get('/admin/')
 
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('admin:login'), response.url)
@@ -561,3 +705,367 @@ class AdminDashboardTests(TestCase):
         self.assertContains(report_response, 'Reports Center')
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response['Content-Type'], 'text/csv')
+
+    def test_admin_management_renders_for_staff(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.get(reverse('admin_management'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Staff Management Hub')
+        self.assertContains(response, 'Choose a Work Area')
+        self.assertContains(response, 'Open Fleet Section')
+
+    def test_staff_can_review_documents_from_management_hub(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        document = Document.objects.create(
+            customer=self.customer,
+            national_id_file=SimpleUploadedFile('id.pdf', b'id'),
+            driver_license_file=SimpleUploadedFile('dl.pdf', b'dl'),
+            verification_status='Pending',
+        )
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'document_review',
+                'document_id': document.id,
+                'section': 'documents',
+                'q': '',
+                'verification_status': 'Approved',
+                'review_notes': 'Documents look clear.',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        document.refresh_from_db()
+        self.assertEqual(document.verification_status, 'Approved')
+        self.assertEqual(document.review_notes, 'Documents look clear.')
+        self.assertEqual(document.reviewed_by, self.staff_user)
+
+    def test_management_hub_shows_uploaded_document_links(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        Document.objects.create(
+            customer=self.customer,
+            national_id_file=SimpleUploadedFile('national-id.pdf', b'id'),
+            driver_license_file=SimpleUploadedFile('driver-license.pdf', b'dl'),
+            verification_status='Pending',
+        )
+
+        response = self.client.get(reverse('admin_management'), {'section': 'documents'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Open National ID')
+        self.assertContains(response, 'Open License')
+
+    def test_staff_can_add_vehicle_from_management_hub(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        next_available_date = (timezone.localdate() + timedelta(days=5)).isoformat()
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'vehicle_create',
+                'section': 'vehicles',
+                'q': '',
+                'name': 'Toyota Prado',
+                'model': 'TXL',
+                'plate_number': 'KZZ 909X',
+                'price_per_day': '18000.00',
+                'vehicle_type': 'SUV',
+                'transmission': 'Automatic',
+                'fuel_type': 'Diesel',
+                'status': 'Booked',
+                'next_available_date': next_available_date,
+                'pickup_location': 'Nairobi, Kenya',
+                'dropoff_location': 'Nairobi, Kenya',
+                'image_url': 'https://example.com/prado.jpg',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Vehicle.objects.filter(plate_number='KZZ 909X').exists())
+        created_vehicle = Vehicle.objects.get(plate_number='KZZ 909X')
+        self.assertEqual(created_vehicle.status, 'Booked')
+        self.assertEqual(created_vehicle.next_available_date.isoformat(), next_available_date)
+        self.assertContains(response, 'added to the fleet')
+
+    def test_staff_vehicle_status_change_persists_after_management_reload(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        next_available_date = (timezone.localdate() + timedelta(days=3)).isoformat()
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'vehicle_save',
+                'vehicle_id': self.vehicle.id,
+                'section': 'vehicles',
+                'q': '',
+                'name': 'BMW X5 Executive',
+                'model': 'xDrive40i',
+                'plate_number': self.vehicle.plate_number,
+                'price_per_day': '2500.00',
+                'vehicle_type': 'SUV',
+                'transmission': 'Manual',
+                'fuel_type': 'Hybrid',
+                'status': 'Booked',
+                'next_available_date': next_available_date,
+                'pickup_location': 'Westlands, Nairobi',
+                'dropoff_location': 'Karen, Nairobi',
+                'image_url': 'https://example.com/bmw.jpg',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.vehicle.refresh_from_db()
+        self.assertEqual(self.vehicle.name, 'BMW X5 Executive')
+        self.assertEqual(self.vehicle.status, 'Booked')
+        self.assertEqual(self.vehicle.transmission, 'Manual')
+        self.assertEqual(self.vehicle.fuel_type, 'Hybrid')
+        self.assertEqual(self.vehicle.next_available_date.isoformat(), next_available_date)
+        self.assertEqual(self.vehicle.pickup_location, 'Westlands, Nairobi')
+        self.assertEqual(self.vehicle.dropoff_location, 'Karen, Nairobi')
+
+        follow_up = self.client.get(reverse('admin_management'), {'section': 'vehicles'})
+        self.assertEqual(follow_up.status_code, 200)
+        self.assertContains(follow_up, 'Booked')
+
+    def test_staff_can_delete_vehicle_without_bookings_from_management_hub(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        removable_vehicle = Vehicle.objects.create(
+            name='Mazda CX-5',
+            model='Touring',
+            plate_number='KYY 808Y',
+            vehicle_type='SUV',
+            transmission='Automatic',
+            fuel_type='Petrol',
+            price_per_day=Decimal('9500.00'),
+            status='Available',
+        )
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'vehicle_delete',
+                'vehicle_id': removable_vehicle.id,
+                'section': 'vehicles',
+                'q': '',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Vehicle.objects.filter(id=removable_vehicle.id).exists())
+        self.assertContains(response, 'removed from the fleet')
+
+    def test_staff_can_update_customer_from_management_hub(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'customer_update',
+                'customer_id': self.customer.id,
+                'section': 'customers',
+                'q': '',
+                'full_name': 'Client Updated',
+                'email': 'updated-client@example.com',
+                'phone': '0711222333',
+                'national_id_number': '44556677',
+                'address': 'Westlands, Nairobi',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.customer.refresh_from_db()
+        self.customer.user.refresh_from_db()
+        self.assertEqual(self.customer.user.first_name, 'Client Updated')
+        self.assertEqual(self.customer.user.username, 'updated-client@example.com')
+        self.assertEqual(self.customer.phone, '0711222333')
+        self.assertContains(response, 'Customer profile updated')
+
+    def test_staff_can_update_pending_or_confirmed_booking_from_management_hub(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.post(
+            reverse('admin_management'),
+            {
+                'action': 'booking_update',
+                'booking_id': self.booking.id,
+                'section': 'bookings',
+                'q': '',
+                'pickup_location': 'Westlands, Nairobi',
+                'dropoff_location': 'JKIA Terminal 1A, Nairobi',
+                'start_date': self.booking.start_date.isoformat(),
+                'end_date': (self.booking.end_date + timedelta(days=1)).isoformat(),
+                'service_type': 'airport_pickup',
+                'status': 'Confirmed',
+                'status_note': '',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.pickup_location, 'Westlands, Nairobi')
+        self.assertEqual(self.booking.dropoff_location, 'JKIA Terminal 1A, Nairobi')
+        self.assertEqual(self.booking.service_type, 'airport_pickup')
+        self.assertContains(response, 'Booking #')
+
+    def test_admin_operations_requires_staff_login(self):
+        response = self.client.get(reverse('admin_operations'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('admin:login'), response.url)
+
+    def test_admin_operations_renders_for_staff(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.get(reverse('admin_operations'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Operations Hub')
+        self.assertContains(response, 'Ready For Handover')
+        self.assertContains(response, 'BMW X5')
+
+    def test_staff_can_start_rental_after_payment(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+
+        response = self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {
+                'action': 'start_rental',
+                'odometer_out': '25000',
+                'fuel_level_out': 'Full',
+                'handover_notes': 'Vehicle released in good condition.',
+                'agreement_signed': 'on',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.booking.refresh_from_db()
+        self.vehicle.refresh_from_db()
+        inspection = ReturnInspection.objects.get(booking=self.booking)
+        self.assertEqual(self.booking.status, 'Rented')
+        self.assertEqual(self.vehicle.status, 'Rented')
+        self.assertEqual(inspection.odometer_out, 25000)
+        self.assertEqual(inspection.fuel_level_out, 'Full')
+        self.assertContains(response, 'Rental handover recorded')
+
+    def test_staff_can_record_return_and_complete_booking(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        self.booking.mark_rented()
+        ReturnInspection.objects.create(
+            booking=self.booking,
+            odometer_out=25000,
+            fuel_level_out='Full',
+        )
+
+        return_response = self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {
+                'action': 'record_return',
+                'actual_return_location': 'Nairobi CBD',
+                'odometer_in': '25380',
+                'fuel_level_in': '3/4',
+                'exterior_condition': 'Good',
+                'interior_condition': 'Good',
+                'damage_notes': '',
+                'late_fee': '',
+                'fuel_fee': '',
+                'cleaning_fee': '',
+                'damage_fee': '',
+                'other_fee': '',
+                'final_notes': 'Returned in clean condition.',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(return_response.status_code, 200)
+        self.booking.refresh_from_db()
+        inspection = ReturnInspection.objects.get(booking=self.booking)
+        self.assertEqual(self.booking.status, 'Returned')
+        self.assertEqual(inspection.settlement_status, 'No Charges')
+
+        complete_response = self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {'action': 'complete_booking'},
+            follow=True,
+        )
+
+        self.assertEqual(complete_response.status_code, 200)
+        self.booking.refresh_from_db()
+        self.vehicle.refresh_from_db()
+        self.assertEqual(self.booking.status, 'Completed')
+        self.assertEqual(self.vehicle.status, 'Available')
+        self.assertContains(complete_response, 'Booking completed successfully')
+
+    def test_staff_must_settle_return_charges_before_completion(self):
+        self.client.login(username='admin@example.com', password='pass12345')
+        self.booking.mark_rented()
+        ReturnInspection.objects.create(
+            booking=self.booking,
+            odometer_out=25000,
+            fuel_level_out='Full',
+        )
+
+        self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {
+                'action': 'record_return',
+                'actual_return_location': 'Nairobi CBD',
+                'odometer_in': '25550',
+                'fuel_level_in': 'Half',
+                'exterior_condition': 'Needs Attention',
+                'interior_condition': 'Good',
+                'damage_notes': 'Minor bumper scratch.',
+                'late_fee': '1500.00',
+                'fuel_fee': '',
+                'cleaning_fee': '',
+                'damage_fee': '2500.00',
+                'other_fee': '',
+                'final_notes': 'Customer returned vehicle late.',
+            },
+            follow=True,
+        )
+
+        blocked_response = self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {'action': 'complete_booking'},
+            follow=True,
+        )
+
+        self.booking.refresh_from_db()
+        inspection = ReturnInspection.objects.get(booking=self.booking)
+        self.assertEqual(self.booking.status, 'Returned')
+        self.assertEqual(inspection.settlement_status, 'Pending')
+        self.assertContains(blocked_response, 'Settle the outstanding return charges')
+
+        settle_response = self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {
+                'action': 'settle_charges',
+                'payment_method': 'Bank Transfer',
+                'transaction_reference': 'BANK-RETURN-1001',
+                'confirm_received': 'on',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(settle_response.status_code, 200)
+        inspection.refresh_from_db()
+        self.assertEqual(inspection.settlement_status, 'Paid')
+
+        self.client.post(
+            reverse('admin_booking_workflow', args=[self.booking.id]),
+            {'action': 'complete_booking'},
+            follow=True,
+        )
+
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, 'Completed')

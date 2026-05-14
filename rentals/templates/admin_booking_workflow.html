@@ -1,0 +1,348 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RIRI Booking Workflow</title>
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
+</head>
+<body class="admin-dashboard-body">
+    <div class="dashboard-shell">
+        {% include 'includes/staff_sidebar.html' %}
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="topbar-kicker">Booking Lifecycle</p>
+                    <h1>Booking #BK{{ booking.id }}</h1>
+                    <div class="dashboard-role-badge">Staff Access</div>
+                </div>
+                <div class="topbar-tools">
+                    <a class="panel-link topbar-link" href="{% url 'admin_operations' %}">Back to Operations</a>
+                    <div class="topbar-date">{{ today_label }}</div>
+                </div>
+            </header>
+
+            {% if messages %}
+                <section class="message-stack">
+                    {% for message in messages %}
+                        <div class="system-message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+
+            <section class="dashboard-panel workflow-hero-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Rental Progress</h2>
+                        <p>Track the handover, return inspection, settlement, and final closure of this booking.</p>
+                    </div>
+                    <span class="booking-pill status-{{ booking.status|lower }}">{{ booking.status }}</span>
+                </div>
+
+                <div class="workflow-progress">
+                    <div class="workflow-step {% if booking.status == 'Confirmed' or booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}is-complete{% endif %}">
+                        <span class="workflow-step-number">1</span>
+                        <div>
+                            <strong>Paid & Confirmed</strong>
+                            <small>Booking is ready for customer release</small>
+                        </div>
+                    </div>
+                    <div class="workflow-step {% if booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}is-complete{% elif booking.status == 'Confirmed' %}is-active{% endif %}">
+                        <span class="workflow-step-number">2</span>
+                        <div>
+                            <strong>Rental Started</strong>
+                            <small>Handover details recorded with odometer and fuel</small>
+                        </div>
+                    </div>
+                    <div class="workflow-step {% if booking.status == 'Returned' or booking.status == 'Completed' %}is-complete{% elif booking.status == 'Rented' %}is-active{% endif %}">
+                        <span class="workflow-step-number">3</span>
+                        <div>
+                            <strong>Return Inspected</strong>
+                            <small>Vehicle checked back in and charges reviewed</small>
+                        </div>
+                    </div>
+                    <div class="workflow-step {% if booking.status == 'Completed' %}is-complete{% elif booking.status == 'Returned' %}is-active{% endif %}">
+                        <span class="workflow-step-number">4</span>
+                        <div>
+                            <strong>Closed & Released</strong>
+                            <small>Booking closed and vehicle sent back into fleet workflow</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-grid lower-grid workflow-grid">
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Booking Summary</h2>
+                            <p>Core trip, customer, and service details for this rental.</p>
+                        </div>
+                    </div>
+
+                    <div class="detail-list">
+                        <div class="detail-row"><span>Customer</span><strong>{{ booking.customer.user.get_full_name|default:booking.customer.user.username }}</strong></div>
+                        <div class="detail-row"><span>Vehicle</span><strong>{{ booking.vehicle.name }} ({{ booking.vehicle.plate_number }})</strong></div>
+                        <div class="detail-row"><span>Trip Window</span><strong>{{ booking.start_date|date:"d M, Y" }} - {{ booking.end_date|date:"d M, Y" }}</strong></div>
+                        <div class="detail-row"><span>Service</span><strong>{{ booking.get_service_type_display }}</strong></div>
+                        <div class="detail-row"><span>Pick-up</span><strong>{{ booking.pickup_location }}</strong></div>
+                        <div class="detail-row"><span>Drop-off</span><strong>{{ booking.dropoff_location }}</strong></div>
+                        <div class="detail-row"><span>Payment Status</span><strong>{% if payment %}{{ payment.status }}{% else %}Not Recorded{% endif %}</strong></div>
+                        {% if booking.rental_started_at %}
+                            <div class="detail-row"><span>Rental Started</span><strong>{{ booking.rental_started_at|date:"d M, Y H:i" }}</strong></div>
+                        {% endif %}
+                        {% if booking.returned_at %}
+                            <div class="detail-row"><span>Vehicle Returned</span><strong>{{ booking.returned_at|date:"d M, Y H:i" }}</strong></div>
+                        {% endif %}
+                        {% if booking.completed_at %}
+                            <div class="detail-row"><span>Booking Closed</span><strong>{{ booking.completed_at|date:"d M, Y H:i" }}</strong></div>
+                        {% endif %}
+                    </div>
+
+                    {% if delivery_agreement %}
+                        <div class="subpanel-box">
+                            <h3>Delivery Agreement</h3>
+                            <div class="detail-row"><span>Delivery Location</span><strong>{{ delivery_agreement.delivery_location }}</strong></div>
+                            <div class="detail-row"><span>Agreement Signed</span><strong>{% if delivery_agreement.agreement_signed %}Yes{% else %}No{% endif %}</strong></div>
+                            {% if delivery_agreement.delivery_date %}
+                                <div class="detail-row"><span>Delivery Date</span><strong>{{ delivery_agreement.delivery_date|date:"d M, Y" }}</strong></div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Financial Snapshot</h2>
+                            <p>Rental total, selected extras, and any post-return charges.</p>
+                        </div>
+                    </div>
+
+                    <div class="detail-list">
+                        <div class="detail-row"><span>Rental Days</span><strong>{{ totals.total_days }}</strong></div>
+                        <div class="detail-row"><span>Vehicle Subtotal</span><strong>KES {{ totals.rental_subtotal|floatformat:0|intcomma }}</strong></div>
+                        <div class="detail-row"><span>Service Fee</span><strong>KES {{ totals.service_total|floatformat:0|intcomma }}</strong></div>
+                        <div class="detail-row"><span>Extras Total</span><strong>KES {{ totals.extras_total|floatformat:0|intcomma }}</strong></div>
+                        <div class="detail-row"><span>Taxes</span><strong>KES {{ totals.taxes|floatformat:0|intcomma }}</strong></div>
+                        <div class="detail-row total-row"><span>Booking Total</span><strong>KES {{ totals.total|floatformat:0|intcomma }}</strong></div>
+                    </div>
+
+                    {% if selected_extras %}
+                        <div class="subpanel-box">
+                            <h3>Selected Extras</h3>
+                            <div class="chip-list">
+                                {% for item in selected_extras %}
+                                    <span class="data-chip">{{ item.service.name }} - KES {{ item.total_amount|floatformat:0|intcomma }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if inspection %}
+                        <div class="subpanel-box">
+                            <h3>Return Charges</h3>
+                            {% if charge_rows %}
+                                <div class="detail-list">
+                                    {% for charge in charge_rows %}
+                                        <div class="detail-row"><span>{{ charge.label }}</span><strong>KES {{ charge.amount|floatformat:0|intcomma }}</strong></div>
+                                    {% endfor %}
+                                    <div class="detail-row total-row"><span>Total Extra Charges</span><strong>KES {{ inspection.total_extra_charges|floatformat:0|intcomma }}</strong></div>
+                                </div>
+                            {% else %}
+                                <p class="subpanel-copy">No extra charges were added during the return inspection.</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </article>
+            </section>
+
+            <section class="dashboard-grid lower-grid workflow-grid">
+                <article class="dashboard-panel form-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>1. Start Rental</h2>
+                            <p>Record the handover details once the booking is paid and the customer is ready to leave with the vehicle.</p>
+                        </div>
+                    </div>
+
+                    {% if booking.status == 'Confirmed' %}
+                    <form method="post" class="admin-form-stack">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="start_rental">
+                        <div class="admin-form-grid">
+                            {% for field in start_form %}
+                                {% if field.field.widget.input_type == 'checkbox' %}
+                                    <div class="admin-field checkbox-field span-2">
+                                        <label class="checkbox-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+                                        {% for error in field.errors %}
+                                            <small class="field-error">{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="admin-field {% if field.name == 'handover_notes' %}span-2{% endif %}">
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% for error in field.errors %}
+                                            <small class="field-error">{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="action-button primary-button">Mark Rental As Started</button>
+                            <p class="form-note">Use this only when the customer has collected the vehicle and the handover has been completed.</p>
+                        </div>
+                    </form>
+                    {% elif booking.status == 'Rented' or booking.status == 'Returned' or booking.status == 'Completed' %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>Rental already started</h3>
+                            <p>The handover step is complete. Move to return inspection or booking closure below.</p>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>Waiting for confirmation and payment</h3>
+                            <p>This step only opens when the booking is confirmed and the payment is marked as paid.</p>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel form-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>2. Record Return Inspection</h2>
+                            <p>Check the vehicle back in, capture its condition, and apply any extra charges before closure.</p>
+                        </div>
+                    </div>
+
+                    {% if booking.status == 'Rented' %}
+                    <form method="post" class="admin-form-stack">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="record_return">
+                        <div class="admin-form-grid">
+                            {% for field in return_form %}
+                                {% if field.field.widget.input_type == 'checkbox' %}
+                                    <div class="admin-field checkbox-field span-2">
+                                        <label class="checkbox-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+                                        {% for error in field.errors %}
+                                            <small class="field-error">{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="admin-field {% if field.name == 'damage_notes' or field.name == 'final_notes' %}span-2{% endif %}">
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% for error in field.errors %}
+                                            <small class="field-error">{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="action-button primary-button">Save Return Inspection</button>
+                            <p class="form-note">The booking will move to <strong>Returned</strong> once the check-in is saved.</p>
+                        </div>
+                    </form>
+                    {% elif booking.status == 'Returned' or booking.status == 'Completed' %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>Return already recorded</h3>
+                            <p>The vehicle has already been checked in. Review settlement and completion below.</p>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>Waiting for rental start</h3>
+                            <p>Start the rental first so the system can later record the return inspection.</p>
+                        </div>
+                    {% endif %}
+                </article>
+            </section>
+
+            <section class="dashboard-grid lower-grid workflow-grid">
+                <article class="dashboard-panel form-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>3. Settle Final Charges</h2>
+                            <p>Capture any post-return payment before releasing the booking from the operational queue.</p>
+                        </div>
+                    </div>
+
+                    {% if inspection and inspection.requires_settlement %}
+                        <div class="settlement-banner">
+                            <strong>Outstanding Charges:</strong>
+                            <span>KES {{ inspection.total_extra_charges|floatformat:0|intcomma }}</span>
+                            <small>Status: {{ inspection.settlement_status }}</small>
+                        </div>
+                        <form method="post" class="admin-form-stack">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="settle_charges">
+                            <div class="admin-form-grid">
+                                {% for field in settlement_form %}
+                                    {% if field.field.widget.input_type == 'checkbox' %}
+                                        <div class="admin-field checkbox-field span-2">
+                                            <label class="checkbox-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+                                            {% for error in field.errors %}
+                                                <small class="field-error">{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="admin-field">
+                                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% for error in field.errors %}
+                                                <small class="field-error">{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="action-button primary-button">Mark Charges As Settled</button>
+                            </div>
+                        </form>
+                    {% elif inspection %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>No settlement needed</h3>
+                            <p>The return inspection does not include any extra charges, so the booking can move straight to completion.</p>
+                        </div>
+                    {% else %}
+                        <div class="empty-panel-state compact-empty-state">
+                            <h3>Waiting for inspection</h3>
+                            <p>Record the return inspection first so the system can determine whether extra settlement is required.</p>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="dashboard-panel form-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>4. Complete Booking</h2>
+                            <p>Close the rental and return the vehicle to the next fleet state.</p>
+                        </div>
+                    </div>
+
+                    <div class="detail-list">
+                        <div class="detail-row"><span>Current Booking Status</span><strong>{{ booking.status }}</strong></div>
+                        <div class="detail-row"><span>Vehicle Will Return To</span><strong>{% if inspection and inspection.requires_maintenance %}Maintenance{% else %}Fleet Availability Check{% endif %}</strong></div>
+                        {% if inspection %}
+                            <div class="detail-row"><span>Settlement Status</span><strong>{{ inspection.settlement_status }}</strong></div>
+                        {% endif %}
+                    </div>
+
+                    <form method="post" class="admin-form-stack">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="complete_booking">
+                        <div class="form-actions">
+                            <button type="submit" class="action-button success-button">Complete Booking & Release Vehicle</button>
+                            <p class="form-note">If this vehicle has a future booking, completing the rental will automatically return it to the correct next fleet status.</p>
+                        </div>
+                    </form>
+                </article>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, Vehicle
+from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, ReturnInspection, Vehicle
 
 
 @admin.register(Customer)
@@ -67,6 +67,19 @@ class BookingAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'start_date')
     search_fields = ('customer__user__username', 'vehicle__name')
+
+
+@admin.register(ReturnInspection)
+class ReturnInspectionAdmin(admin.ModelAdmin):
+    list_display = (
+        'booking',
+        'checked_in_at',
+        'actual_return_location',
+        'settlement_status',
+        'requires_maintenance',
+    )
+    list_filter = ('settlement_status', 'requires_maintenance', 'exterior_condition', 'interior_condition')
+    search_fields = ('booking__customer__user__username', 'booking__vehicle__name', 'actual_return_location')
 
 
 @admin.register(ExtraService)

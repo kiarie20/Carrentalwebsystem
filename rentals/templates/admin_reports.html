@@ -5,44 +5,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RIRI Admin Reports</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260513-1">
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
 </head>
 <body class="admin-dashboard-body">
     <div class="dashboard-shell">
-        <aside class="dashboard-sidebar">
-            <a class="dashboard-brand" href="{% url 'admin_dashboard' %}">
-                <span class="dashboard-brand-mark">R</span>
-                <span>
-                    <strong>RIRI</strong>
-                    <small>Admin Console</small>
-                </span>
-            </a>
-
-            <nav class="dashboard-nav">
-                <a href="{% url 'admin_dashboard' %}">Dashboard</a>
-                <a class="is-active" href="{% url 'admin_reports' %}">Reports</a>
-                <a href="{% url 'admin:rentals_vehicle_changelist' %}">Cars</a>
-                <a href="{% url 'admin:rentals_booking_changelist' %}">Bookings</a>
-                <a href="{% url 'admin:rentals_customer_changelist' %}">Customers</a>
-                <a href="{% url 'admin:rentals_payment_changelist' %}">Payments</a>
-                <a href="{% url 'admin:rentals_document_changelist' %}">Documents</a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="admin-user-card">
-                    <span class="admin-avatar">{{ request.user.username|first|upper }}</span>
-                    <div>
-                        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                        <small>{{ request.user.email|default:"Admin User" }}</small>
-                    </div>
-                </div>
-                <div class="sidebar-actions">
-                    <a href="{% url 'admin:index' %}">Django Admin</a>
-                    <a href="{% url 'home' %}">Public Site</a>
-                    <a href="{% url 'logout_user' %}">Logout</a>
-                </div>
-            </div>
-        </aside>
+        {% include 'includes/staff_sidebar.html' %}
 
         <main class="dashboard-main">
             <header class="dashboard-topbar">
@@ -97,7 +64,7 @@
                             <p>See where customer verification currently stands.</p>
                         </div>
                         <div class="panel-header-actions">
-                            <a class="panel-link" href="{% url 'admin:rentals_document_changelist' %}">Review Documents</a>
+                            <a class="panel-link" href="{% url 'admin_management' %}?section=documents">Review Documents</a>
                         </div>
                     </div>
                     <div class="status-list">

@@ -74,7 +74,7 @@
                 </div>
             {% endif %}
 
-            {% if request.user.is_authenticated and document_status != 'Approved' %}
+            {% if request.user.is_authenticated and show_document_upload %}
                 <div class="content-panel">
                     <div class="section-heading compact-heading">
                         <h2>Document Verification</h2>
@@ -106,7 +106,7 @@
             <div class="content-panel">
                 <div class="section-heading compact-heading">
                     <h2>Choose Your Rental Service</h2>
-                    <p>Select the main service you want for this trip. Delivery remains under extra services below.</p>
+                    <p>Select the main service first. Once that is chosen, the location section below adapts so the customer can search the exact airport terminal, chauffeur meeting point, delivery destination, or self-drive branch they want.</p>
                 </div>
                 <div class="service-option-grid">
                     {% for service in service_options %}
@@ -134,20 +134,38 @@
                         {% endfor %}
                     </div>
                 {% endif %}
+                <div class="service-location-guide" id="service-location-guide">
+                    <strong id="service-location-guide-title">Search the trip locations next.</strong>
+                    <p id="service-location-guide-copy">For self-drive rentals, type the branch, estate, hotel, or landmark the customer wants first. The map only becomes important for chauffeur, airport, or delivery trips that need a precise pin.</p>
+                </div>
             </div>
+
+            <datalist id="common-location-suggestions">
+                {% for suggestion in location_suggestions %}
+                    <option value="{{ suggestion }}"></option>
+                {% endfor %}
+            </datalist>
 
             <div class="booking-form-grid">
                 <div class="field-group">
-                    <label for="{{ form.pickup_location.id_for_label }}">Pick-up Location</label>
+                    <label for="{{ form.pickup_location.id_for_label }}" id="pickup-location-label">Pick-up Location</label>
                     {{ form.pickup_location }}
                     {{ form.pickup_latitude }}
                     {{ form.pickup_longitude }}
+                    <div class="location-field-actions">
+                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="pickup">Search & Save Pick-up</button>
+                        <button class="ghost-button map-mode-button is-active" type="button" data-map-mode="pickup">Refine Pick-up Pin</button>
+                    </div>
                 </div>
                 <div class="field-group">
-                    <label for="{{ form.dropoff_location.id_for_label }}">Drop-off Location</label>
+                    <label for="{{ form.dropoff_location.id_for_label }}" id="dropoff-location-label">Drop-off Location</label>
                     {{ form.dropoff_location }}
                     {{ form.dropoff_latitude }}
                     {{ form.dropoff_longitude }}
+                    <div class="location-field-actions">
+                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="dropoff">Search & Save Drop-off</button>
+                        <button class="ghost-button map-mode-button" type="button" data-map-mode="dropoff">Refine Drop-off Pin</button>
+                    </div>
                 </div>
                 <div class="field-group">
                     <label for="{{ form.start_date.id_for_label }}">Pick-up Date</label>
@@ -157,36 +175,39 @@
                     <label for="{{ form.end_date.id_for_label }}">Drop-off Date</label>
                     {{ form.end_date }}
                 </div>
-                <div class="field-group field-span-2">
-                    <label for="{{ form.delivery_location.id_for_label }}">Delivery Location (only when Nairobi delivery is selected)</label>
+                <div class="field-group field-span-2 delivery-location-group{% if 'nairobi_delivery' not in selected_extra_codes %} is-hidden{% endif %}" id="delivery-location-group">
+                    <label for="{{ form.delivery_location.id_for_label }}" id="delivery-location-label">Delivery Destination</label>
                     {{ form.delivery_location }}
+                    <div class="location-field-actions">
+                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="delivery">Preview Delivery Location</button>
+                    </div>
+                    <small class="field-hint" id="delivery-map-status">Search the exact estate, office, airport terminal, or hotel entrance where the vehicle should be delivered.</small>
                 </div>
-                <p class="field-hint field-span-2">
-                    Enter the hotel, estate, office, terminal, or landmark in the address fields above. Use the map below only when you want to pin the exact gate, entrance, or meeting point.
+                <p class="field-hint field-span-2" id="location-flow-help">
+                    Type the address first. The search buttons locate it on the map and store the exact point for pickup or drop-off, while the map itself is only there to refine the exact gate, terminal, or landmark.
                 </p>
                 {% if form.non_field_errors %}
                     <div class="field-span-2 form-errors">{{ form.non_field_errors }}</div>
                 {% endif %}
             </div>
 
-            <div class="content-panel booking-map-panel">
+            <div class="content-panel booking-map-panel{% if selected_service_type == 'self_drive' and 'nairobi_delivery' not in selected_extra_codes %} is-hidden{% endif %}" id="service-map-panel">
                 <div class="section-heading compact-heading">
-                    <h2>Exact Pin on Map</h2>
-                    <p>The address fields above are still the main route details. This map is optional, but recommended when you want us to follow the exact gate, terminal, hotel entrance, or meeting point.</p>
+                    <h2>Trip Route Map Assistant</h2>
+                    <p>This map works with the same searched locations above. It starts from the customer's live location when permission is allowed, then helps refine the exact terminal, apartment gate, airport pickup lane, or delivery entrance.</p>
                 </div>
                 <div class="map-selection-toolbar">
-                    <button class="secondary-button map-mode-button is-active" type="button" data-map-mode="pickup">Pin Exact Pick-up Point</button>
-                    <button class="secondary-button map-mode-button" type="button" data-map-mode="dropoff">Pin Exact Drop-off Point</button>
                     <button class="ghost-button map-locate-button" type="button" id="locate-current-mode">Use My Current Location for Active Pin</button>
+                    <span class="map-toolbar-note">Active location: <strong id="active-map-mode-label">Pick-up</strong></span>
                 </div>
                 <div class="map-helper-grid">
                     <div class="map-helper-card">
                         <strong>Pick-up Address + Pin</strong>
-                        <p id="pickup-map-status">No exact pick-up pin yet. The address field above will still be used.</p>
+                        <p id="pickup-map-status">No exact pick-up pin yet. Use the pick-up field buttons or click the map after activating the pick-up mode.</p>
                     </div>
                     <div class="map-helper-card">
                         <strong>Drop-off Address + Pin</strong>
-                        <p id="dropoff-map-status">No exact drop-off pin yet. Switch mode only if you want to save a second precise point.</p>
+                        <p id="dropoff-map-status">No exact drop-off pin yet. Use the drop-off field buttons to locate the destination or save the precise entrance.</p>
                     </div>
                 </div>
                 <div id="booking-location-map" class="booking-location-map" aria-label="Booking location map"></div>
@@ -206,6 +227,7 @@
                                 type="checkbox"
                                 name="selected_extras"
                                 value="{{ extra.id }}"
+                                data-extra-code="{{ extra.code }}"
                                 {% if extra.id|stringformat:"s" in selected_extra_ids %}checked{% endif %}
                             >
                             <div>
@@ -305,19 +327,81 @@
                 return;
             }
 
+            const mapPanel = document.getElementById('service-map-panel');
             const pickupField = document.getElementById('{{ form.pickup_location.id_for_label }}');
             const dropoffField = document.getElementById('{{ form.dropoff_location.id_for_label }}');
             const pickupLatField = document.getElementById('{{ form.pickup_latitude.id_for_label }}');
             const pickupLngField = document.getElementById('{{ form.pickup_longitude.id_for_label }}');
             const dropoffLatField = document.getElementById('{{ form.dropoff_latitude.id_for_label }}');
             const dropoffLngField = document.getElementById('{{ form.dropoff_longitude.id_for_label }}');
+            const deliveryField = document.getElementById('{{ form.delivery_location.id_for_label }}');
+            const deliveryGroup = document.getElementById('delivery-location-group');
+            const deliveryStatus = document.getElementById('delivery-map-status');
             const pickupStatus = document.getElementById('pickup-map-status');
             const dropoffStatus = document.getElementById('dropoff-map-status');
             const modeButtons = Array.from(document.querySelectorAll('[data-map-mode]'));
+            const geocodeButtons = Array.from(document.querySelectorAll('[data-geocode-target]'));
             const locateButton = document.getElementById('locate-current-mode');
+            const activeModeLabel = document.getElementById('active-map-mode-label');
+            const serviceRadios = Array.from(document.querySelectorAll('input[name="service_type"]'));
+            const extraCheckboxes = Array.from(document.querySelectorAll('input[name="selected_extras"]'));
+            const pickupLabel = document.getElementById('pickup-location-label');
+            const dropoffLabel = document.getElementById('dropoff-location-label');
+            const deliveryLabel = document.getElementById('delivery-location-label');
+            const flowTitle = document.getElementById('service-location-guide-title');
+            const flowCopy = document.getElementById('service-location-guide-copy');
+            const flowHelp = document.getElementById('location-flow-help');
 
             let currentMode = 'pickup';
             const map = L.map(mapElement).setView([-1.286389, 36.817223], 12);
+            let currentLocationMarker = null;
+            let currentLocationCircle = null;
+            let currentLocationLatLng = null;
+            let deliveryPreviewMarker = null;
+
+            const commonListId = 'common-location-suggestions';
+            [pickupField, dropoffField, deliveryField].forEach((field) => {
+                if (field) {
+                    field.setAttribute('list', commonListId);
+                    field.setAttribute('autocomplete', 'off');
+                }
+            });
+
+            const serviceGuidance = {
+                self_drive: {
+                    pickupLabel: 'Pick-up Location',
+                    dropoffLabel: 'Drop-off Location',
+                    deliveryLabel: 'Delivery Destination',
+                    pickupPlaceholder: 'Search branch, estate, hotel, or landmark',
+                    dropoffPlaceholder: 'Search return branch, estate, hotel, or landmark',
+                    deliveryPlaceholder: 'Search the address for optional vehicle delivery',
+                    title: 'Search the trip locations next.',
+                    copy: 'For self-drive rentals, the customer can simply search the branch, hotel, estate, or landmark they want. The map only appears if an extra delivery point needs a more precise pin.',
+                    help: 'Search the pick-up and drop-off addresses first. For self-drive trips, the typed address is usually enough unless staff want to refine a delivery point or exact entrance on the map.',
+                },
+                chauffeur_drive: {
+                    pickupLabel: 'Client Pick-up Address / Meeting Point',
+                    dropoffLabel: 'Destination / Final Stop',
+                    deliveryLabel: 'Vehicle Delivery Destination',
+                    pickupPlaceholder: 'Search the customer pick-up address, hotel, office, or landmark',
+                    dropoffPlaceholder: 'Search the destination, venue, or return stop',
+                    deliveryPlaceholder: 'Search where the chauffeur should deliver the vehicle',
+                    title: 'Search the route like a chauffeur trip.',
+                    copy: 'Use searchable meeting points for the customer pick-up and the destination. This keeps the chauffeur handover and route details clear for staff.',
+                    help: 'Search both the collection point and destination. The map is best used to refine hotel entrances, office blocks, apartments, or exact road-side meeting points.',
+                },
+                airport_pickup: {
+                    pickupLabel: 'Arrival Airport / Terminal',
+                    dropoffLabel: 'Customer Destination After Airport Pick-up',
+                    deliveryLabel: 'Vehicle Delivery Destination',
+                    pickupPlaceholder: 'Search JKIA Terminal 1A, Wilson Airport, or arrival gate',
+                    dropoffPlaceholder: 'Search the hotel, home, or office destination after pickup',
+                    deliveryPlaceholder: 'Search the delivery point if the vehicle must be delivered onward',
+                    title: 'Search the airport arrival point and destination.',
+                    copy: 'For airport service, search the exact terminal or arrival point first, then the customer destination. This gives staff a cleaner airport meet-and-greet workflow.',
+                    help: 'Search the exact airport terminal or arrival point, then the destination. The map is useful for pinning terminal lanes, airport parking bays, or the exact drop-off entrance.',
+                },
+            };
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -333,6 +417,9 @@
                 modeButtons.forEach((button) => {
                     button.classList.toggle('is-active', button.dataset.mapMode === currentMode);
                 });
+                if (activeModeLabel) {
+                    activeModeLabel.textContent = currentMode === 'pickup' ? 'Pick-up' : 'Drop-off';
+                }
             }
 
             function updateStatus(mode, message) {
@@ -340,6 +427,76 @@
                     pickupStatus.textContent = message;
                 } else {
                     dropoffStatus.textContent = message;
+                }
+            }
+
+            function updateDeliveryStatus(message) {
+                if (deliveryStatus) {
+                    deliveryStatus.textContent = message;
+                }
+            }
+
+            function isDeliverySelected() {
+                return extraCheckboxes.some((checkbox) => checkbox.dataset.extraCode === 'nairobi_delivery' && checkbox.checked);
+            }
+
+            function shouldShowMapPanel(selectedService) {
+                return selectedService === 'chauffeur_drive' || selectedService === 'airport_pickup' || isDeliverySelected();
+            }
+
+            function applyServiceGuidance() {
+                const selectedRadio = serviceRadios.find((radio) => radio.checked);
+                const selectedService = (selectedRadio && selectedRadio.value) || 'self_drive';
+                const guidance = serviceGuidance[selectedService] || serviceGuidance.self_drive;
+
+                if (pickupLabel) {
+                    pickupLabel.textContent = guidance.pickupLabel;
+                }
+                if (dropoffLabel) {
+                    dropoffLabel.textContent = guidance.dropoffLabel;
+                }
+                if (deliveryLabel) {
+                    deliveryLabel.textContent = guidance.deliveryLabel;
+                }
+                if (pickupField) {
+                    pickupField.placeholder = guidance.pickupPlaceholder;
+                }
+                if (dropoffField) {
+                    dropoffField.placeholder = guidance.dropoffPlaceholder;
+                }
+                if (deliveryField) {
+                    deliveryField.placeholder = guidance.deliveryPlaceholder;
+                }
+                if (flowTitle) {
+                    flowTitle.textContent = guidance.title;
+                }
+                if (flowCopy) {
+                    flowCopy.textContent = guidance.copy;
+                }
+                if (flowHelp) {
+                    flowHelp.textContent = guidance.help;
+                }
+                if (deliveryGroup) {
+                    const deliverySelected = isDeliverySelected();
+                    deliveryGroup.classList.toggle('is-hidden', !deliverySelected);
+                    if (!deliverySelected && deliveryField) {
+                        deliveryField.value = '';
+                        delete deliveryField.dataset.lastSearched;
+                        updateDeliveryStatus('Search the exact estate, office, airport terminal, or hotel entrance where the vehicle should be delivered.');
+                        if (deliveryPreviewMarker) {
+                            map.removeLayer(deliveryPreviewMarker);
+                            deliveryPreviewMarker = null;
+                        }
+                    }
+                }
+                if (mapPanel) {
+                    const shouldShowMap = shouldShowMapPanel(selectedService);
+                    mapPanel.classList.toggle('is-hidden', !shouldShowMap);
+                    if (shouldShowMap) {
+                        window.setTimeout(function () {
+                            map.invalidateSize();
+                        }, 120);
+                    }
                 }
             }
 
@@ -353,6 +510,70 @@
                         saveCoordinates(mode, position.lat, position.lng, true);
                     });
                 }
+            }
+
+            function showCurrentLocation(lat, lng, shouldCenter) {
+                currentLocationLatLng = [lat, lng];
+                if (currentLocationMarker) {
+                    currentLocationMarker.setLatLng(currentLocationLatLng);
+                } else {
+                    currentLocationMarker = L.circleMarker(currentLocationLatLng, {
+                        radius: 9,
+                        weight: 3,
+                        color: '#2f72ff',
+                        fillColor: '#7aa4ff',
+                        fillOpacity: 0.82,
+                    }).addTo(map);
+                    currentLocationMarker.bindTooltip('Current location', {
+                        direction: 'top',
+                        offset: [0, -8],
+                    });
+                }
+
+                if (currentLocationCircle) {
+                    currentLocationCircle.setLatLng(currentLocationLatLng);
+                } else {
+                    currentLocationCircle = L.circle(currentLocationLatLng, {
+                        radius: 75,
+                        color: '#2f72ff',
+                        fillColor: '#6f97ff',
+                        fillOpacity: 0.14,
+                        weight: 1,
+                    }).addTo(map);
+                }
+
+                if (shouldCenter) {
+                    map.setView(currentLocationLatLng, 15);
+                }
+            }
+
+            async function searchAddress(query) {
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error('Address lookup failed.');
+                }
+                const data = await response.json();
+                if (!data.length) {
+                    throw new Error('No matching address found.');
+                }
+                return data[0];
+            }
+
+            function setDeliveryPreview(lat, lng, labelText) {
+                if (deliveryPreviewMarker) {
+                    deliveryPreviewMarker.setLatLng([lat, lng]);
+                } else {
+                    deliveryPreviewMarker = L.marker([lat, lng], { opacity: 0.86 }).addTo(map);
+                }
+                deliveryPreviewMarker.bindTooltip(labelText || 'Delivery point', {
+                    direction: 'top',
+                    offset: [0, -8],
+                }).openTooltip();
             }
 
             async function reverseGeocode(lat, lng) {
@@ -402,6 +623,56 @@
                 }
             }
 
+            function requestCurrentLocation(options) {
+                const settings = Object.assign(
+                    {
+                        applyToActivePin: false,
+                        centerOnSuccess: false,
+                        silent: false,
+                    },
+                    options || {}
+                );
+
+                if (!navigator.geolocation) {
+                    if (!settings.silent) {
+                        updateStatus(currentMode, 'This browser cannot share your current location. You can still pin the route manually on the map.');
+                    }
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        showCurrentLocation(lat, lng, settings.centerOnSuccess);
+
+                        if (settings.applyToActivePin) {
+                            saveCoordinates(currentMode, lat, lng, false);
+                        } else {
+                            const modeLabel = currentMode === 'pickup' ? 'pick-up' : 'drop-off';
+                            updateStatus(currentMode, `Current location detected. You can now pin the exact ${modeLabel} point or use the current location button to apply it.`);
+                        }
+
+                        if (locateButton) {
+                            locateButton.disabled = false;
+                        }
+                    },
+                    function () {
+                        if (!settings.silent) {
+                            updateStatus(currentMode, 'Could not access your current location. You can still place the exact pin manually on the map.');
+                        }
+                        if (locateButton) {
+                            locateButton.disabled = false;
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 9000,
+                        maximumAge: 60000,
+                    }
+                );
+            }
+
             function hydrateExistingMarker(mode, latField, lngField) {
                 if (!latField.value || !lngField.value) {
                     return;
@@ -411,6 +682,56 @@
                 if (Number.isFinite(lat) && Number.isFinite(lng)) {
                     setMarker(mode, lat, lng);
                     updateStatus(mode, `Exact pin already saved: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                }
+            }
+
+            async function geocodeCurrentField(mode) {
+                const field = mode === 'pickup' ? pickupField : dropoffField;
+                const query = (field.value || '').trim();
+                if (!query) {
+                    updateStatus(mode, 'Enter an address first, then click the search button.');
+                    field.focus();
+                    return;
+                }
+                currentMode = mode;
+                updateModeButtons();
+                updateStatus(mode, 'Looking up the address on the map...');
+                try {
+                    const result = await searchAddress(query);
+                    const lat = parseFloat(result.lat);
+                    const lng = parseFloat(result.lon);
+                    map.setView([lat, lng], 15);
+                    await saveCoordinates(mode, lat, lng, false);
+                    field.value = result.display_name || field.value;
+                    field.dataset.lastSearched = field.value;
+                    updateStatus(mode, `Address pinned for ${mode === 'pickup' ? 'pick-up' : 'drop-off'}: ${field.value}`);
+                } catch (error) {
+                    updateStatus(mode, error.message || 'Could not match that address on the map.');
+                }
+            }
+
+            async function previewDeliveryLocation() {
+                if (!deliveryField) {
+                    return;
+                }
+                const query = (deliveryField.value || '').trim();
+                if (!query) {
+                    updateDeliveryStatus('Search the delivery address first, then preview it on the map.');
+                    deliveryField.focus();
+                    return;
+                }
+                updateDeliveryStatus('Looking up the delivery location on the map...');
+                try {
+                    const result = await searchAddress(query);
+                    const lat = parseFloat(result.lat);
+                    const lng = parseFloat(result.lon);
+                    map.setView([lat, lng], 15);
+                    deliveryField.value = result.display_name || deliveryField.value;
+                    deliveryField.dataset.lastSearched = deliveryField.value;
+                    setDeliveryPreview(lat, lng, deliveryField.value);
+                    updateDeliveryStatus(`Delivery point previewed: ${deliveryField.value}`);
+                } catch (error) {
+                    updateDeliveryStatus(error.message || 'Could not match that delivery address on the map.');
                 }
             }
 
@@ -425,26 +746,98 @@
                 });
             });
 
+            geocodeButtons.forEach((button) => {
+                button.addEventListener('click', function () {
+                    if (button.dataset.geocodeTarget === 'delivery') {
+                        previewDeliveryLocation();
+                        return;
+                    }
+                    geocodeCurrentField(button.dataset.geocodeTarget);
+                });
+            });
+
+            if (pickupField) {
+                pickupField.addEventListener('focus', function () {
+                    currentMode = 'pickup';
+                    updateModeButtons();
+                });
+            }
+
+            if (dropoffField) {
+                dropoffField.addEventListener('focus', function () {
+                    currentMode = 'dropoff';
+                    updateModeButtons();
+                });
+            }
+
+            if (deliveryField) {
+                deliveryField.addEventListener('focus', function () {
+                    updateDeliveryStatus('Search the exact delivery address or landmark if Nairobi delivery is selected.');
+                });
+            }
+
             if (locateButton && navigator.geolocation) {
                 locateButton.addEventListener('click', function () {
                     locateButton.disabled = true;
-                    navigator.geolocation.getCurrentPosition(
-                        function (position) {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            map.setView([lat, lng], 15);
-                            saveCoordinates(currentMode, lat, lng, false);
-                            locateButton.disabled = false;
-                        },
-                        function () {
-                            locateButton.disabled = false;
-                            updateStatus(currentMode, 'Could not access your current location. You can still place the exact pin manually on the map.');
-                        }
-                    );
+                    requestCurrentLocation({
+                        applyToActivePin: true,
+                        centerOnSuccess: true,
+                    });
                 });
             } else if (locateButton) {
                 locateButton.disabled = true;
             }
+
+            [pickupField, dropoffField].forEach(function (field) {
+                if (!field) {
+                    return;
+                }
+                field.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        geocodeCurrentField(field === pickupField ? 'pickup' : 'dropoff');
+                    }
+                });
+            });
+
+            [pickupField, dropoffField].forEach(function (field) {
+                if (!field) {
+                    return;
+                }
+                field.addEventListener('blur', function () {
+                    const query = (field.value || '').trim();
+                    if (!query || query === field.dataset.lastSearched) {
+                        return;
+                    }
+                    field.dataset.lastSearched = query;
+                    geocodeCurrentField(field === pickupField ? 'pickup' : 'dropoff');
+                });
+            });
+
+            if (deliveryField) {
+                deliveryField.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        previewDeliveryLocation();
+                    }
+                });
+                deliveryField.addEventListener('blur', function () {
+                    const query = (deliveryField.value || '').trim();
+                    if (!query || query === deliveryField.dataset.lastSearched) {
+                        return;
+                    }
+                    deliveryField.dataset.lastSearched = query;
+                    previewDeliveryLocation();
+                });
+            }
+
+            serviceRadios.forEach((radio) => {
+                radio.addEventListener('change', applyServiceGuidance);
+            });
+
+            extraCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', applyServiceGuidance);
+            });
 
             hydrateExistingMarker('pickup', pickupLatField, pickupLngField);
             hydrateExistingMarker('dropoff', dropoffLatField, dropoffLngField);
@@ -457,7 +850,13 @@
                 }
             }
 
+            applyServiceGuidance();
             updateModeButtons();
+            requestCurrentLocation({
+                applyToActivePin: false,
+                centerOnSuccess: !(markers.pickup || markers.dropoff),
+                silent: true,
+            });
         }());
     </script>
 {% endblock %}

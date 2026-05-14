@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}RIRI Car Rentals{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260513-1">
+    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260514-4">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -26,7 +26,6 @@
                 <a href="{% url 'home' %}#contact">Contact</a>
             </nav>
             <div class="nav-actions">
-                <span class="nav-phone">+254 700 123 456</span>
                 {% if request.user.is_authenticated %}
                     <span class="role-badge {% if request.user.is_staff %}role-staff{% else %}role-customer{% endif %}">
                         {% if request.user.is_staff %}Staff Access{% else %}Customer Account{% endif %}
@@ -58,7 +57,6 @@
             <div>
                 <h4>Contact</h4>
                 <p>Nairobi, Kenya</p>
-                <p>+254 700 123 456</p>
                 <p>hello@riricarrentals.com</p>
             </div>
             <div id="about">

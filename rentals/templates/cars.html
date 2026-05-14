@@ -31,6 +31,14 @@
                 <input id="search" type="text" name="q" value="{{ search_query }}" placeholder="Search by name or model">
             </div>
             <div class="field-group">
+                <label for="start_date">Pick-up Date</label>
+                <input id="start_date" type="date" name="start_date" value="{{ selected_start_date }}">
+            </div>
+            <div class="field-group">
+                <label for="end_date">Drop-off Date</label>
+                <input id="end_date" type="date" name="end_date" value="{{ selected_end_date }}">
+            </div>
+            <div class="field-group">
                 <label for="type">Car Type</label>
                 <select id="type" name="type">
                     <option value="">All Types</option>
@@ -66,14 +74,30 @@
                     <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name</option>
                 </select>
             </div>
+            <input type="hidden" name="page" value="1">
             <button class="primary-button full-width" type="submit">Apply Filters</button>
         </form>
     </aside>
 
-    <div class="listing-main">
+    <div class="listing-main" id="results">
         <div class="section-heading">
             <h2>Browse The Fleet</h2>
             <p>Showing {{ result_count }} vehicle{{ result_count|pluralize }} tailored to your current filters.</p>
+            {% if selected_start_date or selected_end_date %}
+                <div class="listing-filter-summary">
+                    {% if selected_start_date %}
+                        <span>Pick-up: {{ selected_start_date }}</span>
+                    {% endif %}
+                    {% if selected_end_date %}
+                        <span>Drop-off: {{ selected_end_date }}</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if date_filter_error %}
+                <div class="alert-card alert-error">
+                    <strong>{{ date_filter_error }}</strong>
+                </div>
+            {% endif %}
         </div>
 
         <div class="vehicle-grid compact-grid">
@@ -118,13 +142,13 @@
         {% if page_obj.paginator.num_pages > 1 %}
             <nav class="pagination">
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Previous</a>
+                    <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&start_date={{ selected_start_date }}&end_date={{ selected_end_date }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Previous</a>
                 {% endif %}
                 {% for number in page_obj.paginator.page_range %}
-                    <a href="?page={{ number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}" class="{% if page_obj.number == number %}is-current{% endif %}">{{ number }}</a>
+                    <a href="?page={{ number }}&q={{ search_query }}&start_date={{ selected_start_date }}&end_date={{ selected_end_date }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}" class="{% if page_obj.number == number %}is-current{% endif %}">{{ number }}</a>
                 {% endfor %}
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Next</a>
+                    <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&start_date={{ selected_start_date }}&end_date={{ selected_end_date }}&type={{ selected_type }}&transmission={{ selected_transmission }}&fuel={{ selected_fuel }}&sort={{ selected_sort }}">Next</a>
                 {% endif %}
             </nav>
         {% endif %}

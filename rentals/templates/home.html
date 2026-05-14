@@ -74,10 +74,10 @@
             {% endfor %}
         </div>
 
-        <form class="search-card home-search-card" method="get" action="{% url 'car_list' %}">
+        <form class="search-card home-search-card" method="get" action="{% url 'car_list' %}#results">
             <div class="field-group">
-                <label for="pickup_location">Pick-up Location</label>
-                <input id="pickup_location" name="q" type="text" placeholder="Enter town, airport, or area">
+                <label for="home_vehicle_search">Search Car</label>
+                <input id="home_vehicle_search" name="q" type="text" placeholder="Search by car name, model, or type">
             </div>
             <div class="field-group">
                 <label for="start_date">Pick-up Date</label>

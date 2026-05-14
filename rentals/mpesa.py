@@ -15,16 +15,19 @@ class MpesaGatewayError(Exception):
     pass
 
 
+def mpesa_missing_settings():
+    required_settings = {
+        'MPESA_CONSUMER_KEY': settings.MPESA_CONSUMER_KEY,
+        'MPESA_CONSUMER_SECRET': settings.MPESA_CONSUMER_SECRET,
+        'MPESA_SHORTCODE': settings.MPESA_SHORTCODE,
+        'MPESA_PASSKEY': settings.MPESA_PASSKEY,
+        'MPESA_CALLBACK_URL': settings.MPESA_CALLBACK_URL,
+    }
+    return [key for key, value in required_settings.items() if not value]
+
+
 def mpesa_is_configured():
-    return all(
-        [
-            settings.MPESA_CONSUMER_KEY,
-            settings.MPESA_CONSUMER_SECRET,
-            settings.MPESA_SHORTCODE,
-            settings.MPESA_PASSKEY,
-            settings.MPESA_CALLBACK_URL,
-        ]
-    )
+    return not mpesa_missing_settings()
 
 
 def normalize_phone_number(phone_number):
