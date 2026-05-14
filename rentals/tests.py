@@ -1,7 +1,7 @@
 import json
 from datetime import date, timedelta
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -22,6 +22,52 @@ class PublicPageTests(TestCase):
         self.assertContains(response, 'How it works')
         self.assertContains(response, 'Verify Identity')
         self.assertContains(response, 'Search Car')
+        self.assertContains(response, 'Explore Fleet')
+
+    @patch('rentals.views.urlopen')
+    def test_location_geocode_api_returns_first_match(self, mock_urlopen):
+        response_handle = MagicMock()
+        response_handle.read.return_value = json.dumps(
+            [
+                {
+                    'display_name': 'JKIA Terminal 1A, Nairobi, Kenya',
+                    'lat': '-1.319167',
+                    'lon': '36.927500',
+                }
+            ]
+        ).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        response = self.client.get(reverse('api_geocode_location'), {'q': 'JKIA Terminal 1A'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {
+                'display_name': 'JKIA Terminal 1A, Nairobi, Kenya',
+                'lat': '-1.319167',
+                'lon': '36.927500',
+            },
+        )
+
+    @patch('rentals.views.urlopen')
+    def test_location_reverse_geocode_api_returns_display_name(self, mock_urlopen):
+        response_handle = MagicMock()
+        response_handle.read.return_value = json.dumps(
+            {'display_name': 'Westlands, Nairobi, Kenya'}
+        ).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        response = self.client.get(
+            reverse('api_reverse_geocode'),
+            {'lat': '-1.267600', 'lon': '36.810800'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {'display_name': 'Westlands, Nairobi, Kenya'},
+        )
 
     def test_admin_login_page_shows_staff_only_message(self):
         response = self.client.get(f"{reverse('admin:login')}?next={reverse('admin_dashboard')}")
@@ -29,6 +75,27 @@ class PublicPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Admin and worker access only.')
         self.assertContains(response, 'Customer? Use the normal login page instead.')
+
+    def test_public_header_links_point_to_distinct_auth_modes(self):
+        response = self.client.get(reverse('home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'{reverse("auth_page")}?mode=login#login')
+        self.assertContains(response, f'{reverse("auth_page")}?mode=register#register')
+        self.assertContains(response, reverse('admin:login'))
+
+    def test_staff_logout_redirects_back_to_staff_login(self):
+        staff_user = User.objects.create_user(
+            username='staff@example.com',
+            email='staff@example.com',
+            password='pass12345',
+            is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(reverse('logout_user'))
+
+        self.assertRedirects(response, f"{reverse('admin:login')}?next={reverse('admin_dashboard')}")
 
 
 class BookingWorkflowTests(TestCase):

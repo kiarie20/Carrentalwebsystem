@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, ReturnInspection, Vehicle
+from .models import Booking, BookingExtra, Customer, DeliveryAgreement, Document, ExtraService, Payment, ReturnInspection, Vehicle, VehicleImage
 
 
 @admin.register(Customer)
@@ -23,6 +23,13 @@ class VehicleAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'vehicle_type', 'fuel_type', 'transmission', 'is_featured')
     search_fields = ('name', 'model', 'plate_number', 'pickup_location', 'dropoff_location')
+
+
+@admin.register(VehicleImage)
+class VehicleImageAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'caption', 'is_primary', 'display_order')
+    list_filter = ('is_primary',)
+    search_fields = ('vehicle__name', 'caption')
 
 
 @admin.register(Document)

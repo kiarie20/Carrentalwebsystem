@@ -82,7 +82,17 @@ class Vehicle(models.Model):
     def primary_image_url(self):
         if self.image:
             return self.image.url
+        primary_gallery_image = self.gallery_images.filter(is_primary=True).order_by('display_order', 'id').first()
+        if primary_gallery_image and primary_gallery_image.resolved_image_url:
+            return primary_gallery_image.resolved_image_url
+        fallback_gallery_image = self.gallery_images.order_by('display_order', 'id').first()
+        if fallback_gallery_image and fallback_gallery_image.resolved_image_url:
+            return fallback_gallery_image.resolved_image_url
         return self.image_url
+
+    @property
+    def gallery_count(self):
+        return self.gallery_images.count()
 
     def refresh_availability(self):
         active_bookings = self.booking_set.filter(status__in=['Pending', 'Confirmed', 'Rented'])
@@ -112,6 +122,27 @@ class Vehicle(models.Model):
             self.next_available_date = None
 
         self.save(update_fields=['status', 'next_available_date'])
+
+
+class VehicleImage(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='gallery_images')
+    image = models.ImageField(upload_to='vehicles/gallery/', blank=True, null=True)
+    image_url = models.URLField(blank=True)
+    caption = models.CharField(max_length=120, blank=True)
+    is_primary = models.BooleanField(default=False)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['display_order', 'id']
+
+    def __str__(self):
+        return f"{self.vehicle.name} Gallery Image"
+
+    @property
+    def resolved_image_url(self):
+        if self.image:
+            return self.image.url
+        return self.image_url
 
 
 class Document(models.Model):

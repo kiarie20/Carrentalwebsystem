@@ -27,7 +27,7 @@
                             <a class="ghost-button light" href="{% url 'account_dashboard' %}">Go to My Account</a>
                         {% endif %}
                     {% else %}
-                        <a class="ghost-button light" href="{% url 'auth_page' %}">Create Account</a>
+                        <a class="ghost-button light" href="{% url 'auth_page' %}?mode=register#register">Create Account</a>
                     {% endif %}
                 </div>
             </div>
@@ -221,4 +221,5 @@
         {% endfor %}
     </div>
 </section>
+
 {% endblock %}

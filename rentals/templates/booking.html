@@ -153,7 +153,7 @@
                     {{ form.pickup_latitude }}
                     {{ form.pickup_longitude }}
                     <div class="location-field-actions">
-                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="pickup">Search & Save Pick-up</button>
+                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="pickup">Search & Pin Pick-up</button>
                         <button class="ghost-button map-mode-button is-active" type="button" data-map-mode="pickup">Refine Pick-up Pin</button>
                     </div>
                 </div>
@@ -163,7 +163,7 @@
                     {{ form.dropoff_latitude }}
                     {{ form.dropoff_longitude }}
                     <div class="location-field-actions">
-                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="dropoff">Search & Save Drop-off</button>
+                        <button class="secondary-button inline-map-button" type="button" data-geocode-target="dropoff">Search & Pin Drop-off</button>
                         <button class="ghost-button map-mode-button" type="button" data-map-mode="dropoff">Refine Drop-off Pin</button>
                     </div>
                 </div>
@@ -339,6 +339,8 @@
             const deliveryStatus = document.getElementById('delivery-map-status');
             const pickupStatus = document.getElementById('pickup-map-status');
             const dropoffStatus = document.getElementById('dropoff-map-status');
+            const geocodeEndpoint = "{% url 'api_geocode_location' %}";
+            const reverseGeocodeEndpoint = "{% url 'api_reverse_geocode' %}";
             const modeButtons = Array.from(document.querySelectorAll('[data-map-mode]'));
             const geocodeButtons = Array.from(document.querySelectorAll('[data-geocode-target]'));
             const locateButton = document.getElementById('locate-current-mode');
@@ -496,6 +498,15 @@
                         window.setTimeout(function () {
                             map.invalidateSize();
                         }, 120);
+                        if (currentLocationLatLng) {
+                            map.setView(currentLocationLatLng, 15);
+                        } else {
+                            requestCurrentLocation({
+                                applyToActivePin: false,
+                                centerOnSuccess: true,
+                                silent: true,
+                            });
+                        }
                     }
                 }
             }
@@ -548,20 +559,17 @@
             }
 
             async function searchAddress(query) {
-                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+                const url = `${geocodeEndpoint}?q=${encodeURIComponent(query)}`;
                 const response = await fetch(url, {
                     headers: {
                         'Accept': 'application/json',
                     },
                 });
-                if (!response.ok) {
-                    throw new Error('Address lookup failed.');
-                }
                 const data = await response.json();
-                if (!data.length) {
-                    throw new Error('No matching address found.');
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Address lookup failed.');
                 }
-                return data[0];
+                return data;
             }
 
             function setDeliveryPreview(lat, lng, labelText) {
@@ -577,16 +585,16 @@
             }
 
             async function reverseGeocode(lat, lng) {
-                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+                const url = `${reverseGeocodeEndpoint}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
                 const response = await fetch(url, {
                     headers: {
                         'Accept': 'application/json',
                     },
                 });
-                if (!response.ok) {
-                    throw new Error('Reverse geocoding failed.');
-                }
                 const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Reverse geocoding failed.');
+                }
                 return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             }
 

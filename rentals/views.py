@@ -1,6 +1,8 @@
 import csv
 import json
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -51,6 +53,7 @@ from .models import (
     ReturnInspection,
     SERVICE_TYPE_CHOICES,
     Vehicle,
+    VehicleImage,
 )
 
 BENEFITS = [
@@ -97,6 +100,23 @@ FUEL_TYPE_OPTIONS = [
     ('Hybrid', 'Hybrid'),
     ('Electric', 'Electric'),
 ]
+
+HOME_HERO_PRIORITY = [
+    'Toyota Harrier',
+    'Toyota Land Cruiser Prado',
+    'BMW X5',
+    'Toyota Crown',
+]
+
+NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org'
+NOMINATIM_HEADERS = {
+    'Accept': 'application/json',
+    'User-Agent': 'RIRI Car Rentals/1.0 (booking-map-assistant)',
+}
+
+
+class NominatimLookupError(Exception):
+    """Raised when the location lookup service cannot be reached reliably."""
 
 
 def get_default_dashboard_url(user):
@@ -316,12 +336,52 @@ def parse_optional_date(value):
     return date.fromisoformat(raw_value)
 
 
+def pick_home_hero_vehicle(featured_vehicles):
+    for preferred_name in HOME_HERO_PRIORITY:
+        for vehicle in featured_vehicles:
+            if vehicle.name == preferred_name:
+                return vehicle
+
+    if featured_vehicles:
+        return featured_vehicles[0]
+    return Vehicle.objects.first()
+
+
+def get_vehicle_showcase_image(vehicle):
+    if not vehicle:
+        return ''
+
+    gallery_image = vehicle.gallery_images.first()
+    if gallery_image and gallery_image.resolved_image_url:
+        return gallery_image.resolved_image_url
+    return vehicle.primary_image_url
+
+
+def nominatim_request(endpoint, params):
+    url = f"{NOMINATIM_BASE_URL}{endpoint}?{urlencode(params)}"
+    request = Request(url, headers=NOMINATIM_HEADERS)
+
+    try:
+        with urlopen(request, timeout=8) as response:
+            payload = response.read().decode('utf-8')
+    except HTTPError as exc:
+        raise NominatimLookupError('Location lookup service is temporarily unavailable.') from exc
+    except URLError as exc:
+        raise NominatimLookupError('Could not connect to the location lookup service.') from exc
+
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise NominatimLookupError('Received an invalid response from the location lookup service.') from exc
+
+
 def home(request):
     ensure_demo_vehicles()
     featured = list(Vehicle.objects.filter(is_featured=True).order_by('price_per_day')[:4])
     if not featured:
         featured = list(Vehicle.objects.order_by('price_per_day')[:4])
-    hero_vehicle = featured[1] if len(featured) > 1 else (featured[0] if featured else None)
+    hero_vehicle = pick_home_hero_vehicle(featured)
+    hero_showcase_image = get_vehicle_showcase_image(hero_vehicle)
     cheapest_vehicle = Vehicle.objects.order_by('price_per_day').first()
     vehicle_types = Vehicle.objects.exclude(vehicle_type='').values_list('vehicle_type', flat=True).distinct()
     home_stats = [
@@ -332,6 +392,7 @@ def home(request):
     context = {
         'active_page': 'home',
         'hero_vehicle': hero_vehicle,
+        'hero_showcase_image': hero_showcase_image,
         'featured_vehicles': featured,
         'benefits': BENEFITS,
         'vehicle_types': vehicle_types,
@@ -417,6 +478,9 @@ def car_list(request):
 def car_detail(request, vehicle_id):
     vehicle = get_object_or_404(Vehicle, id=vehicle_id)
     related_vehicles = Vehicle.objects.exclude(id=vehicle.id).filter(vehicle_type=vehicle.vehicle_type)[:3]
+    gallery_images = list(vehicle.gallery_images.all())
+    if not gallery_images and vehicle.primary_image_url:
+        gallery_images = [{'resolved_image_url': vehicle.primary_image_url, 'caption': vehicle.name}]
     context = {
         'active_page': 'cars',
         'vehicle': vehicle,
@@ -424,7 +488,7 @@ def car_detail(request, vehicle_id):
         'specs': build_vehicle_specs(vehicle),
         'pricing': build_pricing(vehicle),
         'related_vehicles': related_vehicles,
-        'gallery_items': range(4),
+        'gallery_images': gallery_images,
     }
     return render(request, 'car_detail.html', context)
 
@@ -435,6 +499,9 @@ def auth_page(request):
         return redirect(get_default_dashboard_url(request.user))
 
     next_url = request.GET.get('next') or request.POST.get('next') or reverse('home')
+    auth_mode = request.GET.get('mode') or request.POST.get('mode') or 'login'
+    if auth_mode not in {'login', 'register'}:
+        auth_mode = 'login'
     login_form = CustomerLoginForm(request=request)
     register_form = CustomerRegistrationForm()
 
@@ -470,14 +537,83 @@ def auth_page(request):
         'login_form': login_form,
         'register_form': register_form,
         'next_url': next_url,
+        'auth_mode': auth_mode,
         'benefits': BENEFITS,
-        'hero_vehicle': Vehicle.objects.filter(is_featured=True).first() or Vehicle.objects.first(),
+        'hero_vehicle': pick_home_hero_vehicle(list(Vehicle.objects.filter(is_featured=True))) or Vehicle.objects.first(),
     }
     return render(request, 'auth.html', context)
 
 
+def api_geocode_location(request):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'detail': 'Enter a location to search.'}, status=400)
+
+    try:
+        results = nominatim_request(
+            '/search',
+            {
+                'format': 'jsonv2',
+                'limit': 1,
+                'q': query,
+            },
+        )
+    except NominatimLookupError as exc:
+        return JsonResponse({'detail': str(exc)}, status=502)
+
+    if not results:
+        return JsonResponse({'detail': 'No matching location was found.'}, status=404)
+
+    result = results[0]
+    return JsonResponse(
+        {
+            'display_name': result.get('display_name', query),
+            'lat': result.get('lat'),
+            'lon': result.get('lon'),
+        }
+    )
+
+
+def api_reverse_geocode(request):
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    lat = request.GET.get('lat', '').strip()
+    lon = request.GET.get('lon', '').strip()
+    if not lat or not lon:
+        return JsonResponse({'detail': 'Latitude and longitude are required.'}, status=400)
+
+    try:
+        result = nominatim_request(
+            '/reverse',
+            {
+                'format': 'jsonv2',
+                'lat': lat,
+                'lon': lon,
+            },
+        )
+    except NominatimLookupError as exc:
+        return JsonResponse({'detail': str(exc)}, status=502)
+
+    if not result:
+        return JsonResponse({'detail': 'No matching location was found.'}, status=404)
+
+    return JsonResponse(
+        {
+            'display_name': result.get('display_name', f'{lat}, {lon}'),
+        }
+    )
+
+
 def logout_user(request):
+    was_staff = request.user.is_authenticated and request.user.is_staff
     logout(request)
+    if was_staff:
+        login_query = urlencode({'next': reverse('admin_dashboard')})
+        return redirect(f"{reverse('admin:login')}?{login_query}")
     return redirect('home')
 
 
@@ -655,6 +791,8 @@ def admin_management(request):
                     status = 'Available'
                 if status in ['Booked', 'Rented', 'Returned'] and not next_available_date:
                     next_available_date = timezone.localdate()
+                primary_image_file = request.FILES.get('image')
+                gallery_files = request.FILES.getlist('gallery_files')
                 vehicle = Vehicle.objects.create(
                     name=name,
                     model=model,
@@ -670,7 +808,16 @@ def admin_management(request):
                     mileage=int(mileage_raw) if mileage_raw.isdigit() else None,
                     status=status,
                     next_available_date=next_available_date,
+                    image=primary_image_file,
                 )
+                for index, gallery_file in enumerate(gallery_files):
+                    VehicleImage.objects.create(
+                        vehicle=vehicle,
+                        image=gallery_file,
+                        caption=f'{vehicle.name} image {index + 1}',
+                        is_primary=not vehicle.image and index == 0,
+                        display_order=index,
+                    )
                 messages.success(request, f'{vehicle.name} added to the fleet.')
 
             elif action == 'vehicle_save':
@@ -687,6 +834,10 @@ def admin_management(request):
                 vehicle.pickup_location = (request.POST.get('pickup_location') or vehicle.pickup_location).strip()
                 vehicle.dropoff_location = (request.POST.get('dropoff_location') or vehicle.dropoff_location).strip()
                 vehicle.image_url = (request.POST.get('image_url') or vehicle.image_url).strip()
+                primary_image_file = request.FILES.get('image')
+                gallery_files = request.FILES.getlist('gallery_files')
+                if primary_image_file:
+                    vehicle.image = primary_image_file
                 vehicle.price_per_day = Decimal(price_raw) if price_raw else vehicle.price_per_day
                 vehicle.is_featured = request.POST.get('is_featured') == 'on'
                 if status in dict(Vehicle.STATUS_CHOICES):
@@ -707,12 +858,22 @@ def admin_management(request):
                         'pickup_location',
                         'dropoff_location',
                         'image_url',
+                        'image',
                         'price_per_day',
                         'is_featured',
                         'status',
                         'next_available_date',
                     ]
                 )
+                if gallery_files:
+                    next_order = vehicle.gallery_images.count()
+                    for offset, gallery_file in enumerate(gallery_files):
+                        VehicleImage.objects.create(
+                            vehicle=vehicle,
+                            image=gallery_file,
+                            caption=f'{vehicle.name} image {next_order + offset + 1}',
+                            display_order=next_order + offset,
+                        )
                 messages.success(request, f'{vehicle.name} updated successfully.')
 
             elif action == 'vehicle_delete':

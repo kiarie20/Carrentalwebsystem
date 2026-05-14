@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}RIRI Car Rentals{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260514-4">
+    <link rel="stylesheet" href="{% static 'rentals/css/site.css' %}?v=20260515-2">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -37,8 +37,9 @@
                     {% endif %}
                     <a class="ghost-button" href="{% url 'logout_user' %}">Logout</a>
                 {% else %}
-                    <a class="ghost-button" href="{% url 'auth_page' %}">Login</a>
-                    <a class="primary-button" href="{% url 'auth_page' %}">Register</a>
+                    <a class="nav-staff-link" href="{% url 'admin:login' %}?next={% url 'admin_dashboard' %}">Staff Login</a>
+                    <a class="ghost-button" href="{% url 'auth_page' %}?mode=login#login">Login</a>
+                    <a class="primary-button" href="{% url 'auth_page' %}?mode=register#register">Register</a>
                 {% endif %}
             </div>
         </div>

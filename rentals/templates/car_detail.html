@@ -14,14 +14,38 @@
             <strong>{{ vehicle.name }}</strong>
         </nav>
 
-        <div class="detail-hero-card">
+        <div class="detail-hero-card detail-gallery-card">
             {% if vehicle.primary_image_url %}
-                <img class="detail-hero-image" src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
+                <button class="gallery-nav-button gallery-nav-prev{% if gallery_images|length < 2 %} is-hidden{% endif %}" id="gallery-prev" type="button" aria-label="Previous vehicle image">‹</button>
+                <img
+                    class="detail-hero-image"
+                    id="detail-gallery-main"
+                    src="{{ gallery_images.0.resolved_image_url|default:vehicle.primary_image_url }}"
+                    alt="{{ gallery_images.0.caption|default:vehicle.name }}"
+                >
+                <button class="gallery-nav-button gallery-nav-next{% if gallery_images|length < 2 %} is-hidden{% endif %}" id="gallery-next" type="button" aria-label="Next vehicle image">›</button>
+                <div class="detail-gallery-caption" id="detail-gallery-caption">
+                    {{ gallery_images.0.caption|default:vehicle.name }}
+                </div>
             {% endif %}
         </div>
 
         <div class="thumbnail-row">
-            {% for item in gallery_items %}
+            {% for item in gallery_images %}
+                <button
+                    class="thumbnail-card gallery-thumbnail{% if forloop.first %} is-active{% endif %}"
+                    type="button"
+                    data-gallery-thumb
+                    data-image="{{ item.resolved_image_url }}"
+                    data-alt="{{ item.caption|default:vehicle.name }}"
+                    data-caption="{{ item.caption|default:vehicle.name }}"
+                    aria-label="Show {{ item.caption|default:vehicle.name }}"
+                >
+                    {% if item.resolved_image_url %}
+                        <img src="{{ item.resolved_image_url }}" alt="{{ item.caption|default:vehicle.name }}">
+                    {% endif %}
+                </button>
+            {% empty %}
                 <div class="thumbnail-card">
                     {% if vehicle.primary_image_url %}
                         <img src="{{ vehicle.primary_image_url }}" alt="{{ vehicle.name }}">
@@ -128,4 +152,61 @@
         {% endif %}
     </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script>
+        (function () {
+            const mainImage = document.getElementById('detail-gallery-main');
+            const caption = document.getElementById('detail-gallery-caption');
+            const thumbnails = Array.from(document.querySelectorAll('[data-gallery-thumb]'));
+            const prevButton = document.getElementById('gallery-prev');
+            const nextButton = document.getElementById('gallery-next');
+
+            if (!mainImage || !thumbnails.length) {
+                return;
+            }
+
+            let activeIndex = Math.max(thumbnails.findIndex((thumb) => thumb.classList.contains('is-active')), 0);
+
+            function showImage(index) {
+                const safeIndex = (index + thumbnails.length) % thumbnails.length;
+                const selected = thumbnails[safeIndex];
+                if (!selected) {
+                    return;
+                }
+
+                activeIndex = safeIndex;
+                mainImage.src = selected.dataset.image;
+                mainImage.alt = selected.dataset.alt || '{{ vehicle.name|escapejs }}';
+                if (caption) {
+                    caption.textContent = selected.dataset.caption || '{{ vehicle.name|escapejs }}';
+                }
+
+                thumbnails.forEach((thumb, thumbIndex) => {
+                    thumb.classList.toggle('is-active', thumbIndex === safeIndex);
+                });
+            }
+
+            thumbnails.forEach((thumb, index) => {
+                thumb.addEventListener('click', function () {
+                    showImage(index);
+                });
+            });
+
+            if (prevButton) {
+                prevButton.addEventListener('click', function () {
+                    showImage(activeIndex - 1);
+                });
+            }
+
+            if (nextButton) {
+                nextButton.addEventListener('click', function () {
+                    showImage(activeIndex + 1);
+                });
+            }
+
+            showImage(activeIndex);
+        }());
+    </script>
 {% endblock %}

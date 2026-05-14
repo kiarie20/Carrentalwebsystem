@@ -1487,43 +1487,43 @@ body {
 /* Final presentation polish - 2026-05-14 */
 :root {
     --bg: #eff2f7;
-    --surface: rgba(255, 255, 255, 0.95);
-    --surface-soft: rgba(248, 243, 236, 0.9);
-    --line: rgba(129, 94, 84, 0.14);
+    --surface: rgba(255, 255, 255, 0.96);
+    --surface-soft: rgba(244, 248, 252, 0.9);
+    --line: rgba(111, 129, 158, 0.14);
     --text: #131a28;
-    --muted: #5d6578;
+    --muted: #5d6b7f;
     --nav: #08111d;
     --nav-soft: #111d2d;
-    --primary: #c52d2f;
-    --primary-soft: rgba(197, 45, 47, 0.14);
+    --primary: #0d8c81;
+    --primary-soft: rgba(13, 140, 129, 0.14);
     --green: #178f60;
     --green-soft: rgba(23, 143, 96, 0.14);
     --violet: #7e54d6;
     --violet-soft: rgba(126, 84, 214, 0.14);
-    --gold: #efb15c;
-    --gold-soft: rgba(239, 177, 92, 0.16);
-    --rose: #d44a52;
-    --rose-soft: rgba(212, 74, 82, 0.14);
+    --gold: #d3a04b;
+    --gold-soft: rgba(211, 160, 75, 0.16);
+    --rose: #b4534d;
+    --rose-soft: rgba(180, 83, 77, 0.14);
     --shadow: 0 24px 56px rgba(10, 16, 28, 0.1);
 }
 
 body {
     font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     background:
-        radial-gradient(circle at top left, rgba(197, 45, 47, 0.08), transparent 20%),
-        radial-gradient(circle at top right, rgba(239, 177, 92, 0.12), transparent 22%),
+        radial-gradient(circle at top left, rgba(13, 140, 129, 0.08), transparent 20%),
+        radial-gradient(circle at top right, rgba(211, 160, 75, 0.12), transparent 22%),
         linear-gradient(180deg, #fbfcfe 0%, #eff2f7 100%);
 }
 
 .dashboard-sidebar {
     background:
-        radial-gradient(circle at top left, rgba(197, 45, 47, 0.18), transparent 20%),
-        radial-gradient(circle at bottom right, rgba(239, 177, 92, 0.14), transparent 24%),
+        radial-gradient(circle at top left, rgba(13, 140, 129, 0.18), transparent 20%),
+        radial-gradient(circle at bottom right, rgba(211, 160, 75, 0.14), transparent 24%),
         linear-gradient(180deg, #06101c 0%, #0c1626 52%, #142235 100%);
 }
 
 .dashboard-brand-mark {
-    background: linear-gradient(140deg, #6d1423 0%, #c52d2f 56%, #efb15c 140%);
+    background: linear-gradient(140deg, #0b1727 0%, #0d8c81 56%, #d3a04b 145%);
 }
 
 .dashboard-nav a {
@@ -1532,28 +1532,28 @@ body {
 
 .dashboard-nav a:hover,
 .dashboard-nav a.is-active {
-    background: linear-gradient(135deg, #7f1824 0%, #c52d2f 60%, #efb15c 160%);
+    background: linear-gradient(135deg, #085f58 0%, #0d8c81 60%, #d3a04b 165%);
     color: #fff8ef;
 }
 
 .dashboard-role-badge {
-    background: linear-gradient(135deg, rgba(127, 24, 36, 0.14) 0%, rgba(239, 177, 92, 0.14) 100%);
-    color: #9a6222;
-    border-color: rgba(239, 177, 92, 0.24);
+    background: linear-gradient(135deg, rgba(8, 95, 88, 0.12) 0%, rgba(211, 160, 75, 0.14) 100%);
+    color: #8f6325;
+    border-color: rgba(211, 160, 75, 0.24);
 }
 
 .metric-card,
 .dashboard-panel,
 .subpanel-box,
 .management-form-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 243, 236, 0.94) 100%);
-    border-color: rgba(175, 132, 110, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 252, 0.94) 100%);
+    border-color: rgba(111, 129, 158, 0.14);
 }
 
 .management-switch-link:hover,
 .management-switch-link.is-active {
-    background: linear-gradient(135deg, rgba(197, 45, 47, 0.1) 0%, rgba(239, 177, 92, 0.14) 100%);
-    border-color: rgba(197, 45, 47, 0.18);
+    background: linear-gradient(135deg, rgba(13, 140, 129, 0.1) 0%, rgba(211, 160, 75, 0.14) 100%);
+    border-color: rgba(13, 140, 129, 0.16);
 }
 
 .management-switch-link.is-active strong,

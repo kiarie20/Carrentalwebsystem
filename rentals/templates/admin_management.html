@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RIRI Staff Management</title>
-    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-3">
+    <link rel="stylesheet" href="{% static 'rentals/css/admin_dashboard.css' %}?v=20260514-4">
 </head>
 <body class="admin-dashboard-body">
     <div class="dashboard-shell">
@@ -105,7 +105,7 @@
                         <p>Update vehicle pricing, availability, and featured status without leaving the staff hub.</p>
                     </div>
                 </div>
-                <form method="post" class="subpanel-box management-form-card management-create-card">
+                <form method="post" enctype="multipart/form-data" class="subpanel-box management-form-card management-create-card">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="vehicle_create">
                     <input type="hidden" name="section" value="vehicles">
@@ -189,15 +189,23 @@
                             <label>Image URL</label>
                             <input type="url" name="image_url" placeholder="https://...">
                         </div>
+                        <div class="admin-field">
+                            <label>Primary Car Image</label>
+                            <input type="file" name="image" accept="image/*">
+                        </div>
+                        <div class="admin-field span-2">
+                            <label>Gallery Images</label>
+                            <input type="file" name="gallery_files" accept="image/*" multiple>
+                        </div>
                     </div>
                     <div class="management-card-footer">
-                        <small>Use a real image URL now, then add local uploads later if you want tighter control.</small>
+                        <small>Use either a hosted image URL or direct image uploads. Gallery uploads can include exterior, interior, dashboard, and boot-space photos.</small>
                         <button class="primary-button" type="submit">Add Vehicle</button>
                     </div>
                 </form>
                 <div class="management-grid">
                     {% for vehicle in vehicles %}
-                        <form method="post" class="subpanel-box management-form-card">
+                        <form method="post" enctype="multipart/form-data" class="subpanel-box management-form-card">
                             {% csrf_token %}
                             <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
                             <input type="hidden" name="section" value="vehicles">
@@ -274,6 +282,14 @@
                                     <label>Image URL</label>
                                     <input type="url" name="image_url" value="{{ vehicle.image_url }}">
                                 </div>
+                                <div class="admin-field">
+                                    <label>Replace Primary Image</label>
+                                    <input type="file" name="image" accept="image/*">
+                                </div>
+                                <div class="admin-field span-2">
+                                    <label>Add Gallery Images</label>
+                                    <input type="file" name="gallery_files" accept="image/*" multiple>
+                                </div>
                                 <div class="admin-field checkbox-field span-2">
                                     <label class="checkbox-label">
                                         <input type="checkbox" name="is_featured" {% if vehicle.is_featured %}checked{% endif %}>
@@ -282,7 +298,7 @@
                                 </div>
                             </div>
                             <div class="management-card-footer">
-                                <small>Current next available date: {{ vehicle.next_available_date|default:"Now" }}</small>
+                                <small>Current next available date: {{ vehicle.next_available_date|default:"Now" }} . Gallery images: {{ vehicle.gallery_count }}</small>
                                 <div class="management-action-group">
                                     <button class="primary-button" type="submit" name="action" value="vehicle_save">Save Vehicle</button>
                                     <button class="ghost-button danger-button" type="submit" name="action" value="vehicle_delete">Remove Vehicle</button>

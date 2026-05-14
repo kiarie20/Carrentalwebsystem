@@ -31,6 +31,10 @@
                 <span class="section-kicker">Account Access</span>
                 <h2>Login fast or create your account and continue straight into booking.</h2>
                 <p>Returning customers can sign in in a few seconds. New customers can register here, then move directly into booking and document verification.</p>
+                <div class="auth-switcher">
+                    <a class="auth-switcher-link {% if auth_mode == 'login' %}is-active{% endif %}" href="{% url 'auth_page' %}?mode=login#login">Returning Customer Login</a>
+                    <a class="auth-switcher-link {% if auth_mode == 'register' %}is-active{% endif %}" href="{% url 'auth_page' %}?mode=register#register">Create New Account</a>
+                </div>
                 <div class="auth-flow-hints">
                     <span>1. Login or Register</span>
                     <span>2. Complete Booking</span>
@@ -39,14 +43,15 @@
             </section>
 
             <div class="auth-card-grid auth-flow-grid">
-                <section class="content-panel auth-card auth-login-card" id="login">
+                <section class="content-panel auth-card auth-login-card {% if auth_mode == 'login' %}is-featured{% endif %}" id="login">
                     <span class="section-kicker">Returning Customer</span>
                     <h2>Login</h2>
-                    <p>Welcome back. Sign in to continue booking and managing your trips.</p>
+                    <p>Welcome back to returning customers. Sign in to continue booking and managing your trips.</p>
                     <form method="post" class="stack-form">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="login">
                         <input type="hidden" name="next" value="{{ next_url }}">
+                        <input type="hidden" name="mode" value="login">
                         <div class="field-group">
                             <label for="{{ login_form.email.id_for_label }}">Email Address</label>
                             {{ login_form.email }}
@@ -63,7 +68,7 @@
                     <p class="auth-card-footer">New here? Create your account in the next section.</p>
                 </section>
 
-                <section class="content-panel auth-card auth-register-card" id="register">
+                <section class="content-panel auth-card auth-register-card {% if auth_mode == 'register' %}is-featured{% endif %}" id="register">
                     <span class="section-kicker">New Customer</span>
                     <h2>Create Account</h2>
                     <p>Fill in your details to start browsing, booking, and managing your rentals.</p>
@@ -71,6 +76,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="register">
                         <input type="hidden" name="next" value="{{ next_url }}">
+                        <input type="hidden" name="mode" value="register">
                         <div class="field-group">
                             <label for="{{ register_form.full_name.id_for_label }}">Full Name</label>
                             {{ register_form.full_name }}
