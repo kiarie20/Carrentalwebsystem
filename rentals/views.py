@@ -1687,6 +1687,10 @@ def booking_payment(request, booking_id):
     live_mpesa = mpesa_is_configured()
     mpesa_missing = mpesa_missing_settings()
     mpesa_environment = (settings.MPESA_ENVIRONMENT or 'sandbox').strip().lower()
+    if live_mpesa:
+        mpesa_mode = 'live' if mpesa_environment == 'live' else 'sandbox'
+    else:
+        mpesa_mode = 'manual'
     initial = {
         'payment_method': payment.payment_method or 'M-Pesa',
         'payer_phone': customer.phone,
@@ -1702,6 +1706,7 @@ def booking_payment(request, booking_id):
         'totals': build_booking_totals(booking),
         'mpesa_ready': live_mpesa,
         'live_mpesa': live_mpesa,
+        'mpesa_mode': mpesa_mode,
         'mpesa_missing_settings': mpesa_missing,
         'mpesa_environment': mpesa_environment,
         'default_payment_method': payment.payment_method or 'M-Pesa',
@@ -1710,7 +1715,7 @@ def booking_payment(request, booking_id):
             if live_mpesa and mpesa_environment == 'live'
             else 'Send Sandbox M-Pesa Prompt'
             if live_mpesa
-            else 'Submit Payment Reference'
+            else 'Confirm Payment and Booking'
         ),
     }
 

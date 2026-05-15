@@ -240,6 +240,7 @@ class BookingWorkflowTests(TestCase):
         self.vehicle.refresh_from_db()
 
         self.assertEqual(payment.status, 'Paid')
+        self.assertEqual(payment.payer_phone, '254712345678')
         self.assertEqual(payment.transaction_code, 'QWE12345')
         self.assertEqual(booking.status, 'Confirmed')
         self.assertEqual(self.vehicle.status, 'Booked')
@@ -330,7 +331,7 @@ class BookingWorkflowTests(TestCase):
         response = self.client.get(reverse('booking_payment', args=[booking.id]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'M-Pesa gateway is not configured yet.')
+        self.assertContains(response, 'Manual M-Pesa confirmation mode is active.')
         self.assertContains(response, 'MPESA_CONSUMER_KEY')
 
     def test_mpesa_callback_marks_pending_payment_paid(self):

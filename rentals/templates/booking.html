@@ -355,6 +355,7 @@
             const flowHelp = document.getElementById('location-flow-help');
 
             let currentMode = 'pickup';
+            let mapForcedOpen = false;
             const map = L.map(mapElement).setView([-1.286389, 36.817223], 12);
             let currentLocationMarker = null;
             let currentLocationCircle = null;
@@ -443,7 +444,16 @@
             }
 
             function shouldShowMapPanel(selectedService) {
-                return selectedService === 'chauffeur_drive' || selectedService === 'airport_pickup' || isDeliverySelected();
+                return mapForcedOpen || selectedService === 'chauffeur_drive' || selectedService === 'airport_pickup' || isDeliverySelected();
+            }
+
+            function forceMapPanel(mode) {
+                mapForcedOpen = true;
+                if (mode === 'pickup' || mode === 'dropoff') {
+                    currentMode = mode;
+                }
+                applyServiceGuidance();
+                updateModeButtons();
             }
 
             function applyServiceGuidance() {
@@ -558,18 +568,49 @@
                 }
             }
 
+            async function readJson(response) {
+                const text = await response.text();
+                if (!text) {
+                    return {};
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (error) {
+                    throw new Error('Received an invalid location response.');
+                }
+            }
+
             async function searchAddress(query) {
-                const url = `${geocodeEndpoint}?q=${encodeURIComponent(query)}`;
-                const response = await fetch(url, {
+                const backendUrl = `${geocodeEndpoint}?q=${encodeURIComponent(query)}`;
+                try {
+                    const response = await fetch(backendUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await readJson(response);
+                    if (response.ok) {
+                        return data;
+                    }
+                } catch (error) {
+                    // Browser-side fallback below.
+                }
+
+                const directUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+                const response = await fetch(directUrl, {
                     headers: {
                         'Accept': 'application/json',
                     },
                 });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Address lookup failed.');
+                const data = await readJson(response);
+                if (!response.ok || !Array.isArray(data) || !data.length) {
+                    throw new Error('Could not match that address. Try a clearer landmark, hotel, terminal, or estate name.');
                 }
-                return data;
+                return {
+                    display_name: data[0].display_name || query,
+                    lat: data[0].lat,
+                    lon: data[0].lon,
+                };
             }
 
             function setDeliveryPreview(lat, lng, labelText) {
@@ -585,15 +626,30 @@
             }
 
             async function reverseGeocode(lat, lng) {
-                const url = `${reverseGeocodeEndpoint}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
-                const response = await fetch(url, {
+                const backendUrl = `${reverseGeocodeEndpoint}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+                try {
+                    const response = await fetch(backendUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await readJson(response);
+                    if (response.ok && data.display_name) {
+                        return data.display_name;
+                    }
+                } catch (error) {
+                    // Browser-side fallback below.
+                }
+
+                const directUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+                const response = await fetch(directUrl, {
                     headers: {
                         'Accept': 'application/json',
                     },
                 });
-                const data = await response.json();
+                const data = await readJson(response);
                 if (!response.ok) {
-                    throw new Error(data.detail || 'Reverse geocoding failed.');
+                    throw new Error('Could not resolve the exact point name.');
                 }
                 return data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             }
@@ -701,6 +757,7 @@
                     field.focus();
                     return;
                 }
+                forceMapPanel(mode);
                 currentMode = mode;
                 updateModeButtons();
                 updateStatus(mode, 'Looking up the address on the map...');
@@ -728,6 +785,7 @@
                     deliveryField.focus();
                     return;
                 }
+                forceMapPanel(currentMode);
                 updateDeliveryStatus('Looking up the delivery location on the map...');
                 try {
                     const result = await searchAddress(query);
@@ -744,11 +802,13 @@
             }
 
             map.on('click', function (event) {
+                forceMapPanel(currentMode);
                 saveCoordinates(currentMode, event.latlng.lat, event.latlng.lng, false);
             });
 
             modeButtons.forEach((button) => {
                 button.addEventListener('click', function () {
+                    forceMapPanel(button.dataset.mapMode);
                     currentMode = button.dataset.mapMode;
                     updateModeButtons();
                 });
@@ -786,6 +846,7 @@
 
             if (locateButton && navigator.geolocation) {
                 locateButton.addEventListener('click', function () {
+                    forceMapPanel(currentMode);
                     locateButton.disabled = true;
                     requestCurrentLocation({
                         applyToActivePin: true,

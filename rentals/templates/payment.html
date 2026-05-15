@@ -95,26 +95,35 @@
                         {% if live_mpesa %}
                             Use the customer phone number below and we will send an M-Pesa prompt directly to that handset.
                         {% else %}
-                            This page is ready for M-Pesa, but the gateway credentials still need to be configured before the site can send a real STK push.
+                            This page can still confirm the booking, but it is currently running in manual confirmation mode until the Daraja gateway values are configured.
                         {% endif %}
                     </p>
                 </div>
 
-                {% if default_payment_method == 'M-Pesa' and mpesa_ready %}
-                    <div class="alert-card">
-                        <strong>M-Pesa {{ mpesa_environment|title }} gateway is enabled.</strong>
-                        <p>
-                            {% if mpesa_environment == 'live' %}
-                                Once you submit this form, the customer should receive a real Safaricom STK push on their phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
-                            {% else %}
-                                Once you submit this form, the customer should receive a sandbox STK push on the configured test phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
-                            {% endif %}
-                        </p>
-                    </div>
-                {% elif not mpesa_ready %}
-                    <div class="alert-card">
-                        <strong>M-Pesa gateway is not configured yet.</strong>
-                        <p>Add the missing Daraja values to your <code>.env</code> file and use a public HTTPS callback URL if you want this page to send a real STK push instead of staying in local/manual mode.</p>
+                <div
+                    class="alert-card payment-mode-card"
+                    id="payment-mode-card"
+                    data-mpesa-mode="{{ mpesa_mode }}"
+                    data-mpesa-ready="{% if mpesa_ready %}true{% else %}false{% endif %}"
+                >
+                    <strong id="payment-mode-title">
+                        {% if live_mpesa %}
+                            M-Pesa {{ mpesa_environment|title }} gateway is enabled.
+                        {% else %}
+                            Manual M-Pesa confirmation mode is active.
+                        {% endif %}
+                    </strong>
+                    <p id="payment-mode-copy">
+                        {% if live_mpesa and mpesa_environment == 'live' %}
+                            Once you submit this form, the customer should receive a real Safaricom STK push on their phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
+                        {% elif live_mpesa %}
+                            Once you submit this form, the customer should receive a sandbox STK push on the configured test phone. The booking will switch to confirmed as soon as the callback marks the payment as paid.
+                        {% else %}
+                            Enter the customer phone number and the M-Pesa SMS reference, then confirm the payment manually so the booking can move forward cleanly for staff and the customer.
+                        {% endif %}
+                    </p>
+                    {% if not mpesa_ready %}
+                        <p class="field-hint payment-mode-hint">To send a real STK push later, add the Daraja credentials and public callback URL to your <code>.env</code> file.</p>
                         {% if mpesa_missing_settings %}
                             <ul class="setup-checklist">
                                 {% for item in mpesa_missing_settings %}
@@ -122,8 +131,8 @@
                                 {% endfor %}
                             </ul>
                         {% endif %}
-                    </div>
-                {% endif %}
+                    {% endif %}
+                </div>
 
                 <form method="post" class="stack-form">
                     {% csrf_token %}
@@ -138,7 +147,7 @@
                     <div class="field-group">
                         <label for="{{ payment_form.transaction_code.id_for_label }}">Transaction Reference</label>
                         {{ payment_form.transaction_code }}
-                        <small class="field-hint">
+                        <small class="field-hint" id="transaction-reference-hint">
                             {% if live_mpesa %}
                                 Optional for live M-Pesa. Leave it blank if the payment reference will come back from the phone prompt.
                             {% else %}
@@ -164,7 +173,7 @@
                             {% endfor %}
                         </div>
                     {% endif %}
-                    <button class="primary-button full-width" type="submit">{{ payment_cta_label }}</button>
+                    <button class="primary-button full-width" type="submit" id="payment-submit-button">{{ payment_cta_label }}</button>
                 </form>
             </section>
 
@@ -201,4 +210,61 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script>
+        (function () {
+            const methodField = document.getElementById('{{ payment_form.payment_method.id_for_label }}');
+            const phoneField = document.getElementById('{{ payment_form.payer_phone.id_for_label }}');
+            const referenceField = document.getElementById('{{ payment_form.transaction_code.id_for_label }}');
+            const referenceHint = document.getElementById('transaction-reference-hint');
+            const submitButton = document.getElementById('payment-submit-button');
+            const modeCard = document.getElementById('payment-mode-card');
+            const modeTitle = document.getElementById('payment-mode-title');
+            const modeCopy = document.getElementById('payment-mode-copy');
+
+            if (!methodField || !referenceHint || !submitButton || !modeCard || !modeTitle || !modeCopy) {
+                return;
+            }
+
+            const mpesaReady = modeCard.dataset.mpesaReady === 'true';
+            const mpesaMode = modeCard.dataset.mpesaMode;
+
+            function applyPaymentMode() {
+                const method = methodField.value;
+
+                if (method === 'M-Pesa') {
+                    phoneField.closest('.field-group')?.classList.remove('is-hidden');
+                    referenceField.closest('.field-group')?.classList.remove('is-hidden');
+                    if (mpesaReady) {
+                        modeTitle.textContent = mpesaMode === 'live'
+                            ? 'Live M-Pesa prompt will be sent to the customer.'
+                            : 'Sandbox M-Pesa prompt will be sent to the test phone.';
+                        modeCopy.textContent = mpesaMode === 'live'
+                            ? 'Submit once, then complete the STK prompt on the customer phone. The booking stays pending until Safaricom confirms payment.'
+                            : 'Submit once, then complete the sandbox STK prompt on the configured test handset. The booking stays pending until the callback confirms payment.';
+                        referenceHint.textContent = 'Optional for STK push. Leave it blank unless you already have a Safaricom reference from another payment attempt.';
+                        submitButton.textContent = mpesaMode === 'live' ? 'Send Live M-Pesa Prompt' : 'Send Sandbox M-Pesa Prompt';
+                    } else {
+                        modeTitle.textContent = 'Manual M-Pesa confirmation mode is active.';
+                        modeCopy.textContent = 'Use the customer phone number and the SMS receipt code from the completed M-Pesa payment. This confirms the booking immediately inside the system.';
+                        referenceHint.textContent = 'Required in manual mode so the team has the exact M-Pesa receipt code that came back on the customer phone.';
+                        submitButton.textContent = 'Confirm Manual M-Pesa Payment';
+                    }
+                    return;
+                }
+
+                phoneField.closest('.field-group')?.classList.add('is-hidden');
+                referenceField.closest('.field-group')?.classList.remove('is-hidden');
+                modeTitle.textContent = `${method} confirmation`;
+                modeCopy.textContent = 'Enter the payment reference below so the booking can be marked as paid and confirmed.';
+                referenceHint.textContent = 'Required for non-M-Pesa payments so staff can trace the exact transfer or card settlement.';
+                submitButton.textContent = 'Confirm Payment and Booking';
+            }
+
+            methodField.addEventListener('change', applyPaymentMode);
+            applyPaymentMode();
+        }());
+    </script>
 {% endblock %}

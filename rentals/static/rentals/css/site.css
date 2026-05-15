@@ -2787,6 +2787,12 @@ body::after {
     display: none;
 }
 
+.field-group.is-hidden,
+.checkbox-field.is-hidden,
+.alert-card.is-hidden {
+    display: none;
+}
+
 .location-field-actions {
     flex-wrap: wrap;
 }

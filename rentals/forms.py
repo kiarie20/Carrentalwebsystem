@@ -6,6 +6,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
 from .models import Customer, Document, ExtraService, ReturnInspection, SERVICE_TYPE_CHOICES
+from .mpesa import MpesaGatewayError, normalize_phone_number
 
 
 class BookingForm(forms.Form):
@@ -192,6 +193,11 @@ class PaymentForm(forms.Form):
 
         if payment_method == 'M-Pesa' and not payer_phone:
             self.add_error('payer_phone', 'Enter the phone number used for the M-Pesa payment.')
+        elif payment_method == 'M-Pesa' and payer_phone:
+            try:
+                cleaned_data['payer_phone'] = normalize_phone_number(payer_phone)
+            except MpesaGatewayError as exc:
+                self.add_error('payer_phone', str(exc))
 
         if payment_method != 'M-Pesa' and not transaction_code:
             self.add_error('transaction_code', 'Enter the transaction reference for this payment method.')
