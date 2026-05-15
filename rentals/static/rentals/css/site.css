@@ -2965,6 +2965,21 @@ h4,
     color: #fff6ef;
 }
 
+.story-card-dark h2 {
+    color: #fff8f1 !important;
+    text-shadow: 0 10px 24px rgba(4, 10, 20, 0.22);
+}
+
+.story-card-dark p {
+    color: rgba(243, 247, 252, 0.86) !important;
+}
+
+.story-card-dark .soft-eyebrow {
+    color: #ffe7c4 !important;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(216, 168, 74, 0.24);
+}
+
 .section-heading p,
 .process-section-heading p,
 .benefit-card p,
@@ -4052,4 +4067,29 @@ body {
 
 .site-footer p {
     color: rgba(229, 236, 245, 0.8);
+}
+
+/* Harmonize the paired story cards so the section feels visually consistent */
+.home-story .story-card.story-card-dark,
+.home-story .story-card.story-card-light {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.985) 0%, rgba(246, 249, 253, 0.96) 100%) !important;
+    border-color: rgba(104, 123, 149, 0.16) !important;
+    box-shadow: 0 24px 58px rgba(7, 16, 30, 0.09) !important;
+}
+
+.home-story .story-card.story-card-dark h2,
+.home-story .story-card.story-card-light h3 {
+    color: var(--text) !important;
+    text-shadow: none;
+}
+
+.home-story .story-card.story-card-dark p,
+.home-story .story-card.story-card-light p {
+    color: var(--muted) !important;
+}
+
+.home-story .story-card.story-card-dark .soft-eyebrow {
+    color: var(--accent-strong) !important;
+    background: var(--accent-soft) !important;
+    border-color: rgba(216, 168, 74, 0.22) !important;
 }
